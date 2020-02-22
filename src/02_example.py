@@ -48,56 +48,42 @@ class Map:
                 elif num==3:
                     self.data[j+1, i] = 1
                     
-    def create_map_dungeon(self):
+    def create_map_dungeon(self, num_row_rooms=2, num_col_rooms=3):
+        """
+        TODO: 部屋を作らなば場合も実する。その場合、全部がつながっているかをチェックする関数をつくる
+        """
+
         self.data = np.ones(self.data.shape, np.int)
         
         # 適当に配列を分割する
-        # margin = 2
-        # step = 12        
-        # rand_col_idx = random.sample(range(margin, self.w - margin)[::step], 2)
-        # rand_col_idx = np.append(rand_col_idx, 0)
-        # rand_col_idx = np.append(rand_col_idx, self.w-1)        
-        # rand_col_idx = sorted(rand_col_idx)
-        rand_col_idx = [0, int(self.w/3.0*1.0), int(self.w/3.0*2.0), self.w-1]        
-        # rand_raw_idx = random.sample(range(margin, self.h - margin)[:step], 1)
-        # rand_raw_idx = np.append(rand_raw_idx, 0)
-        # rand_raw_idx = np.append(rand_raw_idx, self.h-1)
-        # rand_raw_idx = sorted(rand_raw_idx)
-        rand_raw_idx = [0, int(self.h/2.0), self.h-1]        
-
-        # self.data[:, rand_col_idx] = 0
-        # self.data[rand_raw_idx, :] = 0
-        # self.data[:, 0] = 1
-        # self.data[0, :] = 1
-        # self.data[:, self.w-1] = 1
-        # self.data[self.h-1, :] = 1
-        
+        # NOTE: 各値は偶数でないと道がつながらない。
+        rand_col_idx = [ int(e)&~1 for e in np.linspace(0, self.w-1, num=int(num_col_rooms)+1)]
+        rand_row_idx = [ int(e)&~1 for e in np.linspace(0, self.h-1, num=int(num_row_rooms)+1).astype(np.int)]
 
         # 各部屋の中心, 大きさ
         num_col_rooms = len(rand_col_idx) - 1
-        num_raw_rooms = len(rand_raw_idx) - 1
-        room_max_size_x = np.zeros((num_raw_rooms, num_col_rooms),np.int)
-        room_max_size_y = np.zeros((num_raw_rooms, num_col_rooms),np.int)
-        room_center_x = np.zeros((num_raw_rooms, num_col_rooms), np.int)
-        room_center_y = np.zeros((num_raw_rooms, num_col_rooms),np.int)
+        num_row_rooms = len(rand_row_idx) - 1
+        room_max_size_x = np.zeros((num_row_rooms, num_col_rooms),np.int)
+        room_max_size_y = np.zeros((num_row_rooms, num_col_rooms),np.int)
+        room_center_x = np.zeros((num_row_rooms, num_col_rooms), np.int)
+        room_center_y = np.zeros((num_row_rooms, num_col_rooms),np.int)
 
         for ic in range(len(rand_col_idx)-1):
-            for ir in range(len(rand_raw_idx)-1):
+            for ir in range(len(rand_row_idx)-1):
                 x = int(0.5 * (rand_col_idx[ic] + rand_col_idx[ic+1]))
                 size_x = rand_col_idx[ic+1] - rand_col_idx[ic]
-                y = int(0.5 * (rand_raw_idx[ir] + rand_raw_idx[ir+1]))
-                size_y = rand_raw_idx[ir+1] - rand_raw_idx[ir]
+                y = int(0.5 * (rand_row_idx[ir] + rand_row_idx[ir+1]))
+                size_y = rand_row_idx[ir+1] - rand_row_idx[ir]
 
                 room_center_y[ir, ic] = int(y)
                 room_max_size_y[ir, ic] = int(size_y)
                 room_center_x[ir, ic] = int(x)
                 room_max_size_x[ir, ic] = int(size_x)
-
         
         # 各部屋の大きさを決める
-        room_size_x = np.zeros((num_raw_rooms, num_col_rooms))
-        room_size_y = np.zeros((num_raw_rooms, num_col_rooms))
-        for iy in range(num_raw_rooms):
+        room_size_x = np.zeros((num_row_rooms, num_col_rooms))
+        room_size_y = np.zeros((num_row_rooms, num_col_rooms))
+        for iy in range(num_row_rooms):
             for ix in range(num_col_rooms):            
                 rmsx = room_max_size_x[iy,ix]
                 rmsy = room_max_size_y[iy,ix]
@@ -109,7 +95,7 @@ class Map:
                 room_size_y[iy, ix] = rsy
     
         # 各部屋を塗りつぶす + 通路をつくる
-        for iy in range(num_raw_rooms):
+        for iy in range(num_row_rooms):
             for ix in range(num_col_rooms):            
                 w = room_size_x[iy, ix]
                 h = room_size_y[iy, ix]
@@ -128,84 +114,88 @@ class Map:
                 # cxからcx+rmsx/2.0, cx-rmsx/2.0だけ線を引く
                 # ただし, 端に触れていへ部屋は通路をつくらない
                 
+                rx = int(rmsx/2.0)
+                ry = int(rmsy/2.0)
+                
                 if iy == 0 and ix == 0:
-                    # self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    # self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    # self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    # self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
 
-                elif iy == num_raw_rooms-1 and ix == num_col_rooms-1:
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    # self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    # self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                elif iy == num_row_rooms-1 and ix == num_col_rooms-1:
+                    self.data[exit_left, cx-rx:cx] = 0
+                    # self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == 0 and ix == num_col_rooms-1:
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    # self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    # self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    self.data[exit_left, cx-rx:cx] = 0
+                    # self.data[exit_right, cx:cx+rx] = 0
+                    # self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
 
-                elif iy == num_raw_rooms-1 and ix == 0:
-                    # self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    # self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                elif iy == num_row_rooms-1 and ix == 0:
+                    # self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    # self.data[cy:cy+ry, exit_x_down] = 0
 
-                elif iy == num_raw_rooms-1 and ix == 0:
-                    # self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    # self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                elif iy == num_row_rooms-1 and ix == 0:
+                    # self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == 0:
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    # self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    # self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
 
-                elif iy == num_raw_rooms-1:
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    # self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                elif iy == num_row_rooms-1:
+                    self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif ix == 0:
-                    # self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    # self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif ix == num_col_rooms-1:
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    # self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    self.data[exit_left, cx-rx:cx] = 0
+                    # self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
                             
                 else:                
-                    self.data[exit_left, cx-int(rmsx/2.0):cx] = 0
-                    self.data[exit_right, cx:cx+int(rmsx/2.0)] = 0
-                    self.data[cy-int(rmsy/2.0):cy, exit_x_up] = 0
-                    self.data[cy:cy+int(rmsy/2.0), exit_x_down] = 0
+                    self.data[exit_left, cx-rx:cx] = 0
+                    self.data[exit_right, cx:cx+rx] = 0
+                    self.data[cy-ry:cy, exit_x_up] = 0
+                    self.data[cy:cy+ry, exit_x_down] = 0
 
         # 線をつなげる
         rand_col_idx = np.array(rand_col_idx)
-        print(rand_col_idx)
+        # print(rand_col_idx)
         for col_idx in rand_col_idx[1:-1]:
+            print(col_idx)
             end_y_l = np.where(self.data[:, col_idx - 1]== 0 )
             end_y_r = np.where(self.data[:, col_idx + 1]== 0 )
-            for idx in range(num_raw_rooms):
+            for idx in range(num_row_rooms):
                 end_y = sorted([end_y_l[0][idx], end_y_r[0][idx]])
                 self.data[end_y[0]:end_y[1]+1, col_idx] = 0                
 
-        rand_raw_idx = np.array(rand_raw_idx)
-        print(rand_raw_idx)
-        for raw_idx in rand_raw_idx[1:-1]:
-            end_x_u = np.where(self.data[raw_idx - 1, :]== 0 )
-            end_x_d = np.where(self.data[raw_idx + 1, :]== 0 )
+        rand_row_idx = np.array(rand_row_idx)
+        # print(rand_row_idx)
+        for row_idx in rand_row_idx[1:-1]:
+            end_x_u = np.where(self.data[row_idx - 1, :]== 0 )
+            end_x_d = np.where(self.data[row_idx + 1, :]== 0 )
             for idx in range(num_col_rooms):
                 end_x = sorted([end_x_u[0][idx], end_x_d[0][idx]])
-                self.data[raw_idx, end_x[0]:end_x[1]+1] = 0                
+                self.data[row_idx, end_x[0]:end_x[1]+1] = 0                
 
         # ゴールの初期をきめておく
         x = np.random.randint(self.w)
@@ -238,7 +228,7 @@ class App:
         
         self.state = State.START
 
-        pyxel.init(48, 32, caption=self.name, scale=6, fps=15)
+        pyxel.init(48, 36, caption=self.name, scale=6, fps=15)
         pyxel.image(0).load(0, 0, "pyxel_logo_38x16.png") # opening
         
         # 地図の初期化
@@ -253,7 +243,7 @@ class App:
         while self.map.data[y, x] != 0:
             x = int(np.random.rand() * pyxel.width)
             y = int(np.random.rand() * pyxel.height)            
-        c = 11 # int(np.random.randint(15)) + 1 # 1...15の整数
+        c = 11
         self.v = Vehicle(x, y, c)
 
         # 獲得アイテす数
