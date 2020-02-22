@@ -228,7 +228,7 @@ class App:
         
         self.state = State.START
 
-        pyxel.init(48, 36, caption=self.name, scale=6, fps=15)
+        pyxel.init(128, 96, caption=self.name, scale=4, fps=15)
         pyxel.image(0).load(0, 0, "pyxel_logo_38x16.png") # opening
         
         # 地図の初期化
@@ -308,8 +308,8 @@ class App:
     def draw(self):
         if self.state == State.START:
             pyxel.cls(0)
-            pyxel.text(0, 0, "Start(s)", pyxel.frame_count % 16)
-            pyxel.blt(30, 40, 0, 0, 0, 38, 16)
+            pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "1 PLAYER GAME",  7 )            
+            # pyxel.blt(0, 0, 0, 0, 0, 38, 16)
             
         elif self.state == State.MAIN:
             pyxel.cls(0)
@@ -322,10 +322,7 @@ class App:
             pyxel.cls(0)
             pyxel.text(0, 0, "Next map(s)", pyxel.frame_count % 16)
             pyxel.blt(30, 40, 0, 0, 0, 38, 16)
-            
-            
 
-            
             
     def draw_map(self):
         # 迷路を描画
