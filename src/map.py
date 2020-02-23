@@ -1,11 +1,40 @@
+from enum import Enum
 import numpy as np
+from scipy.signal import convolve2d
+from scipy.ndimage.filters import minimum_filter, maximum_filter
+
+def dilation(arr, ksize=3):                
+
+    ret_arr = np.copy(arr)
+    dilation_kernel = np.ones((ksize, ksize))
+    if ksize % 2 == 0: 
+        l = int(ksize / 2.0)
+        r = int(ksize / 2.0)
+    else:
+        l = int(np.floor(ksize / 2.0))
+        r = int(np.floor(ksize / 2.0))+1    
+            
+    for iy in range(l, arr.shape[0]-r):
+        for ix in range(l, arr.shape[1]-r):
+            if np.any(arr[iy, ix]==0):
+                ret_arr[iy-l:iy+r, ix-l:ix+r] = 0                            
+    return ret_arr
 
 class Map:
     def __init__(self, w, h, debug=False):
         super().__init__()
+        """
+        self.dataが地図
+        0: 走行可能
+        1: 走行不可
+        -1: ゴール
+        -2: スタート
+        """
         self.w = w
         self.h = h
+
         self.data = np.zeros((h, w), np.int)
+    
         self.goal_x = 0 
         self.goal_y = 0
         self.start_x = 0 
@@ -33,7 +62,12 @@ class Map:
                 elif num==3:
                     self.data[j+1, i] = 1
                     
-    def create_map_dungeon(self, num_col_rooms=3, num_row_rooms=2):
+    def create_map_dungeon(self, num_col_rooms=3, 
+                           num_row_rooms=2, 
+                           corrider_width=1, 
+                           min_room_size_ratio=0.3, 
+                           max_room_size_ratio=0.9
+                           ):
         """
         TODO: 部屋を作らなば場合も実する。その場合、全部がつながっているかをチェックする関数をつくる
         """
@@ -73,9 +107,8 @@ class Map:
                 rmsx = room_max_size_x[iy,ix]
                 rmsy = room_max_size_y[iy,ix]
                 
-                rsx = np.random.randint(int(rmsx*0.3), int(rmsx*0.9))
-                rsy = np.random.randint(int(rmsy*0.3), int(rmsy*0.9))
-
+                rsx = np.random.randint(int(rmsx * min_room_size_ratio), int(rmsx * max_room_size_ratio))
+                rsy = np.random.randint(int(rmsy * min_room_size_ratio), int(rmsy * max_room_size_ratio))
                 room_size_x[iy, ix] = rsx
                 room_size_y[iy, ix] = rsy
     
@@ -103,56 +136,42 @@ class Map:
                 ry = int(rmsy/2.0)
                 
                 if iy == 0 and ix == 0:
-                    # self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
-                    # self.data[cy-ry:cy, exit_x_up] = 0
                     self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == num_row_rooms-1 and ix == num_col_rooms-1:
                     self.data[exit_left, cx-rx:cx] = 0
-                    # self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
-                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == 0 and ix == num_col_rooms-1:
                     self.data[exit_left, cx-rx:cx] = 0
-                    # self.data[exit_right, cx:cx+rx] = 0
-                    # self.data[cy-ry:cy, exit_x_up] = 0
                     self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == num_row_rooms-1 and ix == 0:
-                    # self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
-                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == num_row_rooms-1 and ix == 0:
-                    # self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
-                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == 0:
                     self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
-                    # self.data[cy-ry:cy, exit_x_up] = 0
                     self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == num_row_rooms-1:
                     self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
-                    # self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif ix == 0:
-                    # self.data[exit_left, cx-rx:cx] = 0
                     self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
                     self.data[cy:cy+ry, exit_x_down] = 0
 
                 elif ix == num_col_rooms-1:
                     self.data[exit_left, cx-rx:cx] = 0
-                    # self.data[exit_right, cx:cx+rx] = 0
                     self.data[cy-ry:cy, exit_x_up] = 0
                     self.data[cy:cy+ry, exit_x_down] = 0
                             
@@ -164,9 +183,7 @@ class Map:
 
         # 線をつなげる
         rand_col_idx = np.array(rand_col_idx)
-        # print(rand_col_idx)
         for col_idx in rand_col_idx[1:-1]:
-            # print(col_idx)
             end_y_l = np.where(self.data[:, col_idx - 1]== 0 )
             end_y_r = np.where(self.data[:, col_idx + 1]== 0 )
             for idx in range(num_row_rooms):
@@ -174,7 +191,6 @@ class Map:
                 self.data[end_y[0]:end_y[1]+1, col_idx] = 0                
 
         rand_row_idx = np.array(rand_row_idx)
-        # print(rand_row_idx)
         for row_idx in rand_row_idx[1:-1]:
             end_x_u = np.where(self.data[row_idx - 1, :]== 0 )
             end_x_d = np.where(self.data[row_idx + 1, :]== 0 )
@@ -182,7 +198,10 @@ class Map:
                 end_x = sorted([end_x_u[0][idx], end_x_d[0][idx]])
                 self.data[row_idx, end_x[0]:end_x[1]+1] = 0                
 
-        # ゴールの初期をきめておく
+        if corrider_width > 1:            
+            self.data = dilation(self.data, ksize=corrider_width)
+
+        # 0でないセルからひとつゴールの初期値をきめる
         x = np.random.randint(self.w)
         y = np.random.randint(self.h)        
         while self.data[y, x] != 0:
@@ -192,8 +211,8 @@ class Map:
         self.goal_y = y
 
     def set_start(self):
-        # スタートの設置 # TODO: 壁からは選ばないようにする
-        self.data[self.start_y, self.start_x] = 0 # Reset Goal
+                
+        self.data[self.start_y, self.start_x] = 0 # Reset 
 
         x = np.random.randint(self.w)
         y = np.random.randint(self.h)        
@@ -229,7 +248,7 @@ class Map:
         import matplotlib.cm as cm
         import matplotlib.colors as colors
         import numpy as np
-        from scipy.ndimage.filters import minimum_filter, maximum_filter
+        
         
         start_goal = np.zeros((self.h, self.w), dtype=int)
         cost = np.zeros((self.h, self.w), dtype=int) + 999
