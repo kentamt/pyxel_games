@@ -1,4 +1,5 @@
 from enum import Enum
+import random
 import numpy as np
 from scipy.signal import convolve2d
 from scipy.ndimage.filters import minimum_filter, maximum_filter
@@ -27,7 +28,7 @@ class City:
         self.dataが地図
         0: 走行可能
         1: 走行不可
-        [2,...]:目的地番号
+        [2,...]:目的地番号, 偶数は排土場、奇数は積み込み場
         -1: ゴール
         -2: スタート
 
@@ -37,9 +38,12 @@ class City:
         self.w = w
         self.h = h
         self.data = np.zeros((h, w), np.int)
+        self.occupancuy = np.zeros((h, w), dtype=bool) # True = キャラがいる
             
         self.location_idxs = list(range(2, 100))
         self.locations = {}
+        self.dumpings = {} # 排土場所
+        self.loadings = {} # 積み込み場所
         # {
         #      2: (x, y)
         # }
@@ -122,6 +126,7 @@ class City:
                 room_size_y[iy, ix] = rsy
     
         # 各部屋を塗りつぶす + 通路をつくる
+        corriders = np.ones(self.data.shape, np.int)
         for iy in range(num_row_rooms):
             for ix in range(num_col_rooms):            
                 w = room_size_x[iy, ix]
@@ -143,83 +148,87 @@ class City:
                 
                 rx = int(rmsx/2.0)
                 ry = int(rmsy/2.0)
-
+                
                 # 列が1つの場合
                 if num_row_rooms == 1 and ix == 0:
-                    self.data[exit_right, cx:cx+rx] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
                 elif num_row_rooms == 1 and ix == num_col_rooms-1:
-                    self.data[exit_left, cx-rx:cx] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
                 # 行が1つの場合
                 elif num_col_rooms == 1 and iy == 0:
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
                 elif num_col_rooms == 1 and iy == num_row_rooms-1:
-                    self.data[cy-ry:cy, exit_x_up] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
 
                 elif iy == 0 and ix == 0:
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
                 # 
                 elif iy == num_row_rooms-1 and ix == num_col_rooms-1:
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
                 # 
                 elif iy == 0 and ix == num_col_rooms-1:
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
                 # 
                 elif iy == num_row_rooms-1 and ix == 0:
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
                 # 
                 elif iy == num_row_rooms-1 and ix == 0:
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
 
                 elif iy == 0:
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
 
                 elif iy == num_row_rooms-1:
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
 
                 elif ix == 0:
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
 
                 elif ix == num_col_rooms-1:
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
                             
                 else:                
-                    self.data[exit_left, cx-rx:cx] = 0
-                    self.data[exit_right, cx:cx+rx] = 0
-                    self.data[cy-ry:cy, exit_x_up] = 0
-                    self.data[cy:cy+ry, exit_x_down] = 0
+                    corriders[exit_left, cx-rx:cx] = 0
+                    corriders[exit_right, cx:cx+rx] = 0
+                    corriders[cy-ry:cy, exit_x_up] = 0
+                    corriders[cy:cy+ry, exit_x_down] = 0
 
         # 線をつなげる
         rand_col_idx = np.array(rand_col_idx)
         for col_idx in rand_col_idx[1:-1]:
-            end_y_l = np.where(self.data[:, col_idx - 1]== 0 )
-            end_y_r = np.where(self.data[:, col_idx + 1]== 0 )
+            end_y_l = np.where(corriders[:, col_idx - 1]== 0 )
+            end_y_r = np.where(corriders[:, col_idx + 1]== 0 )
             for idx in range(num_row_rooms):
                 end_y = sorted([end_y_l[0][idx], end_y_r[0][idx]])
-                self.data[end_y[0]:end_y[1]+1, col_idx] = 0                
+                corriders[end_y[0]:end_y[1]+1, col_idx] = 0                
 
         rand_row_idx = np.array(rand_row_idx)
         for row_idx in rand_row_idx[1:-1]:
-            end_x_u = np.where(self.data[row_idx - 1, :]== 0 )
-            end_x_d = np.where(self.data[row_idx + 1, :]== 0 )
+            end_x_u = np.where(corriders[row_idx - 1, :]== 0 )
+            end_x_d = np.where(corriders[row_idx + 1, :]== 0 )
             for idx in range(num_col_rooms):
                 end_x = sorted([end_x_u[0][idx], end_x_d[0][idx]])
-                self.data[row_idx, end_x[0]:end_x[1]+1] = 0                
+                corriders[row_idx, end_x[0]:end_x[1]+1] = 0                
 
         if corrider_width > 1:            
-            self.data = dilation(self.data, ksize=corrider_width)
+            dilated_corriders = dilation(corriders, ksize=corrider_width)
+            corriders = np.logical_xor(dilated_corriders.astype(np.bool), ~(corriders).astype(np.bool))
+
+        self.data = np.logical_and(self.data, corriders)
+
 
         # 各部屋に場所番号を与える
         idx = 0
@@ -229,17 +238,38 @@ class City:
                 cx = room_center_x[iy, ix]
                 cy = room_center_y[iy, ix]                
                 
-                self.data[cy, cx] = self.location_idxs[idx % len(self.location_idxs)]
+                # self.data[cy, cx] = self.location_idxs[idx % len(self.location_idxs)]
                 # print(cx, cy, self.data[cy, cx])
                 self.locations[self.data[cy, cx]] = (cy, cx)
                 idx += 1
+            
+        # 積み込み場と排土場に分ける TODO:偶奇でわけているだけ
+        self.dumpings = {e[0]:e[1] for e in self.locations.items() if e[0] % 2 == 0}
+        self.loadings = {e[0]:e[1] for e in self.locations.items() if e[0] % 2 != 0}
+
+    def get_free_space(self, num=1):
+        
+        idx = list(zip(*np.where(self.data==0)))
+        xy = random.sample(idx, num)
+        # x = random.sample(range(self.w), num, replace=False)
+        # y = random.choice(range(self.h), num, replace=False)
+        # x = np.random.randint(self.w)
+        # y = np.random.randint(self.h)        
+        # while self.data[y, x] != 0:
+        #     x = random.choice(range(self.w), num, replace=False)
+        #     y = random.choice(range(self.h), num, replace=False)
+
+        #     x = np.random.randint(self.w)
+        #     y = np.random.randint(self.h)        
+    
+        return xy
 
     def set_start(self):
 
         # 地図中にスタートがあれば通路0に置き換え
         self.data = np.where(self.data == -2, 0, self.data)
         
-        # 通路0を引くまでランダムに選択する
+        # 通路0を引くまでランダムに選択する TODO: np.where + random.sampleで置き換える
         x = np.random.randint(self.w)
         y = np.random.randint(self.h)        
         while self.data[y, x] != 0 and self.data[y, x] != -1:
@@ -251,7 +281,7 @@ class City:
         self.start_y = y
         
     def set_goal(self):
-        # 地図中にゴールがあれば通路0に置き換え
+        # 地図中にゴールがあれば通路0に置き換えTODO: np.where + random.sampleで置き換える
         self.data = np.where(self.data == -1, 0, self.data)
 
         x = np.random.randint(self.w)
@@ -278,7 +308,7 @@ class City:
         start_goal = np.zeros((self.h, self.w), dtype=int)
         cost = np.zeros((self.h, self.w), dtype=int) + 999
         done = np.zeros((self.h, self.w), dtype=bool)
-        barrier = np.zeros((self.h, self.w), dtype=bool)
+        barrier = np.zeros((self.h, self.w), dtype=bool) # occupancyも含める
         path = np.zeros((self.h, self.w), dtype=int)
         
         #プーリング用のフィルタ
@@ -297,6 +327,13 @@ class City:
                 if self.data[iy, ix] == 1: # barrier
                     barrier[iy, ix] = True 
 
+        barrier = barrier + self.occupancuy
+        barrier[start[0], start[1]] = False
+        barrier[goal[0], goal[1]] = False
+        # print(barrier)
+        # plt.imshow(barrier, cmap="gist_yarg")
+        # plt.show()
+        
         # print('start\n{}'.format(start))
         # print('goal\n{}'.format(goal))
         # print('cost\n{}'.format(cost))
@@ -306,9 +343,9 @@ class City:
         for i in range(1, 999):
 
             #次に進出するマスのbool
-            done_next = maximum_filter(done, footprint=g) * ~done
-            #print('done_next\n{}'.format(done_next))
-            
+            done_next = maximum_filter(done, footprint=g) * ~done            
+            # print('done_next\n{}'.format(done_next))
+
             #次に進出するマスのcost
             cost_next = minimum_filter(cost, footprint=g) * done_next
             cost_next[done_next] += 1
@@ -323,6 +360,7 @@ class City:
             
             #探索終了マスを更新
             done[done_next] = done_next[done_next]
+            
             #ただし障害物は探索終了としない
             done[barrier] = False
             #print('done\n{}'.format(done))
@@ -414,11 +452,11 @@ if __name__ == "__main__":
 
     from collections import deque
     
-    width = 128
+    width = 64
     height = 64
-    map = Map(width, height, debug=False)
+    map = City(width, height, debug=True)
     # map.create_map_stick_down()
-    map.create_map_dungeon(num_col_rooms=5, num_row_rooms=4)
+    map.create_map_dungeon(num_col_rooms=2, num_row_rooms=2, corrider_width=3)
     map.set_goal()
     map.set_start()
     route = map.search_shortest_path_dws((map.start_y, map.start_x), (map.goal_y, map.goal_x))

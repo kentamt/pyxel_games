@@ -44,7 +44,7 @@ class App:
         self.name = "03_example"
         self.state = State.START
         self.header = 32 #[pix]
-        pyxel.init(96, 96, caption=self.name, scale=3, fps=15)
+        pyxel.init(96, 96, caption=self.name, scale=7, fps=15)
         
 
 
@@ -58,8 +58,8 @@ class App:
         
         # 地図の初期化
         self.map = City(pyxel.width, pyxel.height-self.header)
-        self.num_col_rooms = 3
-        self.num_row_rooms = 3
+        self.num_col_rooms = 2
+        self.num_row_rooms = 2
         self.corrider_width = 2
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
                                     num_row_rooms=self.num_row_rooms,
@@ -71,11 +71,16 @@ class App:
         
         # 自キャラの初期化
         self.num_vehicles = 4
-        self.cars = [Vehicle(self.map.start_x, self.map.start_y, 11) for i in range(self.num_vehicles)]
-        for car in self.cars:
-            self.map.occupancuy[car.y, car.x] = True
+        self.cars = []
+        start_points = self.map.get_free_space(num=self.num_vehicles)
+        for idx, xy in enumerate(start_points):
+            x = xy[1]
+            y = xy[0]
+            v = Vehicle(x, y, 11)
+            self.cars.append(v)
+            self.map.occupancuy[y, x] = True
         
-        
+
         for car in self.cars:        
             if car.loaded:
                 car.dest = random.choice(list(self.map.dumpings.items())) # (idx, (y, x)) # キャラの目的地
