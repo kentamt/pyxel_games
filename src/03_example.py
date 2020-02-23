@@ -46,7 +46,7 @@ class App:
         self.total_score = 0 # 運んだ量
         
         # 地図の初期化
-        self.map = City(pyxel.width, pyxel.height)
+        self.map = City(pyxel.width, pyxel.height-30)
         self.num_col_rooms = 3
         self.num_row_rooms = 3
         self.corrider_width = 2
