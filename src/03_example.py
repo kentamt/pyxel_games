@@ -45,9 +45,7 @@ class App:
         self.state = State.START
         self.header = 32 #[pix]
         pyxel.init(96, 96, caption=self.name, scale=7, fps=15)
-        
-
-
+    
 
         # 
         self.waiting_count = 7 # [frames]

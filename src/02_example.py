@@ -132,7 +132,7 @@ class App:
     def act_enemy(self):
         
         # 最短経路の更新
-        if not pyxel.frame_count % 8:
+        if not pyxel.frame_count % 15:
         
             self.route = self.map.search_shortest_path_dws((self.enemy.y, self.enemy.x), (self.ego.y, self.ego.x))
             self.route = deque(self.route)
