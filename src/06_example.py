@@ -56,7 +56,7 @@ class App:
         self.map = Maze(128, 64)
         self.num_col_rooms = 4
         self.num_row_rooms = 3
-        self.corrider_width = 1
+        self.corrider_width = 3
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
                                     num_row_rooms=self.num_row_rooms,
                                     corrider_width=self.corrider_width,
