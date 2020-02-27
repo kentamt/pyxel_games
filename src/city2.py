@@ -343,7 +343,7 @@ class City:
             
             
         self.data = np.logical_and(self.data, corriders)
-
+        self.data = self.data.astype(np.int)
 
         # 各部屋に場所番号を与える
         idx = 0

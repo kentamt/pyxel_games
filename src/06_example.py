@@ -48,6 +48,7 @@ class App:
         pyxel.init(256, 256, caption=self.name, scale=2, fps=10)
         pyxel.load("my_resource.pyxres")
 
+        self.tick = 0
         scale = int(256/16)
 
         self.map = City(128, 64) # int(pyxel.width), int(pyxel.height/8))
@@ -179,7 +180,8 @@ class App:
         print(self.ego.x, self.ego.y)
         print(self.ego_vx, self.ego_vy)
 
-    
+        if pyxel.frame_count%5 == 0:
+            self.tick += 1
     def draw(self):
         """
         描画に関することのみここでは書く。状態は変更しないこと。
@@ -238,7 +240,10 @@ class App:
         bltw = 16
         blth = 16
         if self.ego.d == Direction.DOWN:
-            bltx = 16*0
+            if self.tick % 2 == 0:
+                bltx = 16*0
+            else:
+                bltx = 16*8
             blty = 0
         elif self.ego.d == Direction.UP:
             bltx = 16*1
@@ -263,7 +268,7 @@ class App:
             blty = 0
             
             
-        pyxel.blt(self.ego_vx, self.ego_vy, 0, bltx, 16, bltw, blth)
+        pyxel.blt(self.ego_vx, self.ego_vy, 0, bltx, blty, bltw, blth)
         
         # print(self.ego.x, self.ego.y)
 

@@ -35,10 +35,10 @@ class Map:
 
         self.data = np.zeros((h, w), np.int)
     
-        self.goal_x = 0 
-        self.goal_y = 0
-        self.start_x = 0 
-        self.start_y = 0
+        self.goal_x = None
+        self.goal_y = None
+        self.start_x = None 
+        self.start_y = None
         
         self.debug = debug         
         
@@ -201,19 +201,12 @@ class Map:
         if corrider_width > 1:            
             self.data = dilation(self.data, ksize=corrider_width)
 
-        # 0でないセルからひとつゴールの初期値をきめる
-        x = np.random.randint(self.w)
-        y = np.random.randint(self.h)        
-        while self.data[y, x] != 0:
-            x = np.random.randint(self.w)
-            y = np.random.randint(self.h)        
-        self.goal_x = x
-        self.goal_y = y
-
     def set_start(self):
-                
-        self.data[self.start_y, self.start_x] = 0 # Reset 
 
+        # 地図中にスタートがあれば通路0に置き換え
+        self.data = np.where(self.data == -2, 0, self.data)
+        
+        # 通路0を引くまでランダムに選択する
         x = np.random.randint(self.w)
         y = np.random.randint(self.h)        
         while self.data[y, x] != 0 and self.data[y, x] != -1:
@@ -224,10 +217,9 @@ class Map:
         self.start_x = x
         self.start_y = y
         
-
     def set_goal(self):
-        # ゴールの設置 # TODO: 壁からは選ばないようにする
-        self.data[self.goal_y, self.goal_x] = 0 # Reset Goal
+        # 地図中にゴールがあれば通路0に置き換え
+        self.data = np.where(self.data == -1, 0, self.data)
 
         x = np.random.randint(self.w)
         y = np.random.randint(self.h)        
