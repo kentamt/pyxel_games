@@ -5,7 +5,7 @@ from collections import deque
 import numpy as np
 import pyxel
 
-from city2 import City
+from city import City
 
 class State(Enum):
   START = 1 # 開始演出

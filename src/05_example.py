@@ -6,7 +6,7 @@ from collections import deque
 import numpy as np
 import pyxel
 
-from city2 import City
+from city import City
 
 class State(Enum):
   START = 1 # 開始演出
@@ -77,7 +77,7 @@ class App:
         描画に関することのみここでは書く。状態は変更しないこと。
         """
         pyxel.cls(0)
-        pyxel.text(5, 5, "04-EXAMPLE",  7)            
+        pyxel.text(5, 5, self.name,  7)            
         
         class TyleType(Enum):
             WALL_IN_UP = 1,
