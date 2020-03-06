@@ -34,7 +34,7 @@ def draw_tile(x, y, tile_type):
 
     
 class Man:
-    def __init__(self, _x, _y, _c, _d=Direction.UP):
+    def __init__(self, _x, _y, _c, _d=Direction.UP, _hp=10):
         super().__init__()
         self.x = _x
         self.y = _y
@@ -42,6 +42,9 @@ class Man:
         self.d = _d # 描画用の方向
         self.moved = False
         self.attacked = False
+
+        self.hitpoints = _hp
+
 
     def update(self, _x, _y):
         self.x = _x
@@ -61,8 +64,11 @@ class App:
         pyxel.load("my_resource.pyxres")
         
         # SE
-        pyxel.sound(0).set("A3", "N", "6", "F", 20)
+        pyxel.sound(0).set("A3", "N", "3", "F", 20) # 剣を振る
         pyxel.sound(1).set("F2RRF2RRF2RRF2RR", "N", "6", "F", 10) # 階段
+        pyxel.sound(2).set("C1", "N", "6", "F", 15) # 攻撃があたる
+        # pyxel.sound(3).set("D", "N", "6", "F", 30) # 敵が死ぬ
+        pyxel.sound(3).set("A3", "T", "3", "F", 20) # 敵の攻撃
         
         # 画面切り替え時間
         self.change_view_timer = 13# [frames] 1secくらいまつ        
@@ -210,6 +216,21 @@ class App:
                 if (pyxel.btn(pyxel.KEY_W)):
                     self.ego.moved = True
                     self.ego.attacked = True
+                    attacked_cell = [self.ego.x, self.ego.y]
+                    if self.ego.d == Direction.UP:
+                        dx = 0
+                        dy = -1
+                    elif self.ego.d == Direction.RIGHT:
+                        dx = 1
+                        dy = 0
+                    elif self.ego.d == Direction.DOWN:
+                        dx = 0
+                        dy = 1
+                    elif self.ego.d == Direction.LEFT:
+                        dx = -1
+                        dy = 0
+                    attacked_cell[0] += dx
+                    attacked_cell[1] += dy
             
             if not self.ego.moved:
                 self.move_target(self.ego)
@@ -217,10 +238,23 @@ class App:
             # 画面内に表示される分だけのローカル地図
             self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
 
+            # 攻撃の結果を更新
+            if self.ego.attacked:
+                if self.enemy.x == attacked_cell[0] and self.enemy.y == attacked_cell[1]:
+                    # 敵の体力を減らす
+                    self.enemy.hitpoints -= 3    
+                    pyxel.play(3, [2]) # 攻撃があたる音
+
             # 敵キャラの行動
-            if self.ego.moved == True:
-                self.act_enemy()            
-            
+            if self.enemy.hitpoints > 0:
+                if self.ego.moved == True:
+                    self.act_enemy()                        
+                    
+                if self.enemy.attacked:
+                    pyxel.play(3, [3]) # 攻撃があたる音
+                    self.ego.hitpoints -= 1
+                    self.enemy.attacked = False
+                    
                     
             # 探索済みのフラグ更新
             cx = int(self.ego.x)
@@ -301,7 +335,7 @@ class App:
         if self.state == State.START:
             pyxel.cls(0)
             pyxel.text(0, 0, self.name, 7)
-            pyxel.text(20, 20, "LOW RISK WORRIOR TAKACHI'S MISTERY DUNGEON",  7)      
+            pyxel.text(20, 20, "LOW RISK WARRIOR TAKACHI'S MISTERY DUNGEON",  7)      
             pyxel.text(40, 74, "PRESS S TO START",  7)      
 
         elif self.state == State.MAIN:
@@ -320,14 +354,20 @@ class App:
             self.draw_ego()
 
             # 敵キャラの描画
-            self.draw_enemy()
+            if self.enemy.hitpoints > 0:
+                self.draw_enemy()
             
             # スモールマップの描画
             self.draw_small_map()            
 
             # ゲームタイトルの描画            
             pyxel.text(5, 5, self.name,  7) 
+            
+            # フロア
             pyxel.text(50, 5, f"{self.floor}F",  7) 
+            
+            # 体力
+            pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/10",  7) 
 
         elif self.state == State.QUESTION:
 
@@ -399,6 +439,10 @@ class App:
             pyxel.blt(self.ene_vx, self.ene_vy, 0, 96, 32, 16, 16, 0)
         else:
             pyxel.blt(self.ene_vx, self.ene_vy, 0, 96, 48, 16, 16, 0)
+
+        # HPの表示
+        pyxel.text(self.ene_vx, self.ene_vy-5, f"{self.enemy.hitpoints}/10", 7)
+
 
     def draw_ego(self):
 
@@ -590,8 +634,9 @@ class App:
             next_cell = self.route.popleft()
 
             # 重なることはしない
+            # もし隣接していれば敵の攻撃
             if next_cell[1] == self.ego.x and next_cell[0] == self.ego.y:
-                pass
+                self.enemy.attacked = True
             else: 
                 self.enemy.update(int(next_cell[1]), int(next_cell[0]))
 
@@ -600,38 +645,47 @@ class App:
 
 
     def move_target(self, target):
+        """
+        入力されたキーと異なる方向をむいていた場合、
+        まず向きだけをかえる
+        """
+        
+        
         mx = target.x
         my = target.y            
         ms = 1
-        # x = mx * 16
-        # y = my * 16
-        # s = ms * 16
 
         if pyxel.btn(pyxel.KEY_LEFT):            
             if self.map.data[int(my), int(mx-ms)] != 1:
-                self.ego.d = Direction.LEFT
-                mx = mx - ms
-                target.moved = True
+                if self.ego.d == Direction.LEFT:
+                    mx = mx - ms
+                    target.moved = True
+                else:
+                    self.ego.d = Direction.LEFT
                 
-
         if pyxel.btn(pyxel.KEY_RIGHT):            
             if self.map.data[int(my), int(mx+ms)] != 1:
-                self.ego.d = Direction.RIGHT
-                mx = mx + ms
-                target.moved = True
-                
+                if self.ego.d == Direction.RIGHT:
+                    mx = mx + ms
+                    target.moved = True
+                else:
+                    self.ego.d = Direction.RIGHT
         if pyxel.btn(pyxel.KEY_UP):
             if self.map.data[int(my-ms), int(mx)] != 1:
-                self.ego.d = Direction.UP
-                my = my - ms
-                target.moved = True
-                
+                if self.ego.d == Direction.UP:        
+                    my = my - ms
+                    target.moved = True
+                else:
+                    self.ego.d = Direction.UP
+                            
         if pyxel.btn(pyxel.KEY_DOWN):            
             if self.map.data[int(my+ms), int(mx)] != 1:
-                self.ego.d = Direction.DOWN
-                my = my + ms
-                target.moved = True
-                
+                if self.ego.d == Direction.DOWN:
+                    my = my + ms
+                    target.moved = True
+                else:
+                    self.ego.d = Direction.DOWN
+        
         if pyxel.btn(pyxel.KEY_LEFT) and pyxel.btn(pyxel.KEY_UP):
             if self.map.data[int(my-ms), int(mx-ms)] != 1:
                 self.ego.d = Direction.UPLEFT
