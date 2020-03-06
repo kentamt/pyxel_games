@@ -57,9 +57,17 @@ class App:
         self.state = State.START
 
         # ゲームの設定
-        pyxel.init(256, 256, caption=self.name, scale=2, fps=15)
+        pyxel.init(256, 256, caption=self.name, scale=2, fps=10)
         pyxel.load("my_resource.pyxres")
         
+        # SE
+        pyxel.sound(0).set("A3", "N", "6", "F", 20)
+        pyxel.sound(1).set("F2RRF2RRF2RRF2RR", "N", "6", "F", 10) # 階段
+        
+        # 画面切り替え時間
+        self.change_view_timer = 13# [frames] 1secくらいまつ        
+        
+        # フロア
         self.floor = 0 # [F]
 
         # タイミング
@@ -240,16 +248,26 @@ class App:
         elif self.state == State.QUESTION:
             if (pyxel.btn(pyxel.KEY_Y)):                    
                 self.state = State.CHANGE
+                pyxel.play(1, [1]) # 階段をおりる音
             elif (pyxel.btn(pyxel.KEY_N)):                    
                 self.state = State.MAIN
       
         elif self.state == State.CHANGE:
+
+            # 急に画面が切り替わらないように少しまつ
+            if self.change_view_timer > 0:
+                self.change_view_timer -= 1
+                return
+            
+            self.change_view_timer = 13 # 初期化
+
             self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
                                     num_row_rooms=self.num_row_rooms,
                                     corrider_width=self.corrider_width,
                                     max_room_size_ratio=0.8,
                                     min_room_size_ratio=0.2
             )
+            
             self.map.set_goal()
 
             # 見たことある場所
@@ -263,7 +281,6 @@ class App:
             yx = self.map.get_free_space(num=1)
             self.enemy = Man(yx[1], yx[0], 14, Direction.UP) 
             self.route = deque()
-
 
             # 自分両中心で描画可能な範囲だけを取り出しち地図と、その左右上下のマージン
             self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
@@ -296,149 +313,48 @@ class App:
             _, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
             self.create_tile_map()
 
-
             # 地図の描画
-            for i in range(16):
-                for j in range(16):
-                    x = i * 16
-                    y = j * 16
-                    
-                    tile_type = self.tile_info_map[j, i]
-                    if tile_type == 1:
-                        draw_tile(x, y, TyleType.WALL_IN_UP)
-
-                    elif tile_type == 2:
-                        draw_tile(x, y, TyleType.WALL_IN_DOWN)
-                        
-                    elif tile_type == 3:
-                        draw_tile(x, y, TyleType.WALL_IN_LEFT)
-
-                    elif tile_type == 4:
-                        draw_tile(x, y, TyleType.WALL_IN_RIGHT)
-                    
-                    elif tile_type == 5:
-                        draw_tile(x, y, TyleType.WALL_IN_UL_CORNER)
-
-                    elif tile_type == 6:
-                        draw_tile(x, y, TyleType.WALL_IN_DL_CORNER)
-
-                    elif tile_type == 7:
-                        draw_tile(x, y, TyleType.WALL_IN_UR_CORNER)
-
-                    elif tile_type == 8:
-                        draw_tile(x, y, TyleType.WALL_IN_DR_CORNER)
-                    # -----
-                    elif tile_type == 9:
-                        draw_tile(x, y, TyleType.WALL_OUT_UP)
-
-                    elif tile_type == 10:
-                        draw_tile(x, y, TyleType.WALL_OUT_DOWN)
-
-                    elif tile_type == 11:
-                        draw_tile(x, y, TyleType.WALL_OUT_LEFT)
-
-                    elif tile_type == 12:
-                        draw_tile(x, y, TyleType.WALL_OUT_RIGHT)
-
-                    elif tile_type == 13:
-                        draw_tile(x, y, TyleType.WALL_OUT_UL_CORNER)
-
-                    elif tile_type == 14:
-                        draw_tile(x, y, TyleType.WALL_OUT_DL_CORNER)
-
-                    elif tile_type == 15:
-                        draw_tile(x, y, TyleType.WALL_OUT_UR_CORNER)
-
-                    elif tile_type == 16:
-                        draw_tile(x, y, TyleType.WALL_OUT_DR_CORNER)
-                        
-                    # elif tile_type == 17:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_H_CENTER)
-
-                    # elif tile_type == 18:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_V_CENTER)
-
-                    # elif tile_type == 19:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_LEFT)
-                        
-                    # elif tile_type == 20:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_RIGHT)
-                        
-                    # elif tile_type == 21:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_UP)
-                    # elif tile_type == 22:
-                    #     draw_tile(x, y, TyleType.WALL_CORRIDER_DOWN)
-                        
-                    elif tile_type == 23:
-                        draw_tile(x, y, TyleType.GOAL)
-                    
-                    else:
-                        pass
+            self.draw_map()
             
-
             # 自キャラの描画
-            # 基本は画面中央で、画面端のときだけ視覚中央からはずれる            
-            self.ego_vx = self.margins[0] * 16 
-            self.ego_vy = self.margins[2] * 16
-            # pyxel.rect(self.ego_vx, self.ego_vy, 16, 16, 11)  
-            self.draw_vehicle(self.ego_vx, self.ego_vy)        
-            # 攻撃の描画
-            if self.ego.attacked:
-                if self.ego.d == Direction.UP:
-                    pyxel.circb(self.ego_vx+8, self.ego_vy+8-16, 8, 7)  
-                elif self.ego.d == Direction.RIGHT:
-                    pyxel.circb(self.ego_vx+8+16, self.ego_vy+8, 8, 7)  
-                elif self.ego.d == Direction.DOWN:
-                    pyxel.circb(self.ego_vx+8, self.ego_vy+8+16, 8, 7)  
-                elif self.ego.d == Direction.LEFT:
-                    pyxel.circb(self.ego_vx+8-16, self.ego_vy+8, 8, 7)  
-                
-                self.ego.attacked = False
+            self.draw_ego()
 
             # 敵キャラの描画
-            self.ene_vx = self.ego_vx + (self.enemy.x - self.ego.x) * 16
-            self.ene_vy = self.ego_vy + (self.enemy.y - self.ego.y) * 16
-
-            # localでの自キャラとの相対位置計算
-            # if -8 < self.enemy.x - self.ego.x < 8 and -8 < self.enemy.y - self.ego.y < 8:                
-            pyxel.rect(self.ene_vx, self.ene_vy, 16, 16, 8)  
-
-
-
+            self.draw_enemy()
             
-                    
-            # スモールマップの描画みたことあるところだけ描画
-            smap_margin = 15 # [pix]
-            for i in range(self.map.w):
-                for j in range(self.map.h):                                                
-                    x = i + smap_margin
-                    y = j + smap_margin   
-                    if self.map.data[j, i] == 0:
-                        if self.is_seen[j, i] == True:
-                            pyxel.rect(x, y, 1, 1, 5)
-                        else:
-                            pass
-                            # pyxel.rect(x, y, 1, 1, 12)
-
-            # スモールマップの自キャラと視野範囲の描画
-            _, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
-            lsmx, rsmx, usmy, dsmy = self.margins
-            cx = int(self.ego.x)
-            cy = int(self.ego.y)
-            pyxel.rect (cx + smap_margin, cy + smap_margin, 1,  1, 11)
-            pyxel.rectb(cx - lsmx + smap_margin, cy - usmy + 15, 16, 16, 8)
-
-
-
+            # スモールマップの描画
+            self.draw_small_map()            
 
             # ゲームタイトルの描画            
             pyxel.text(5, 5, self.name,  7) 
             pyxel.text(50, 5, f"{self.floor}F",  7) 
-                       
+
         elif self.state == State.QUESTION:
-                pyxel.rect(self.ego_vx-12, self.ego_vy-17, 50, 13, 13)
-                pyxel.text(self.ego_vx-10, self.ego_vy-15, "ORIRU?[Y/N]", 7)
-                    
+
+            pyxel.cls(0)
+            
+            _, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
+            self.create_tile_map()
+
+            # 地図の描画
+            self.draw_map()
+            
+            # 自キャラの描画
+            self.draw_ego()
+
+            # 敵キャラの描画
+            self.draw_enemy()
+
+            # スモールマップの描画
+            self.draw_small_map()            
+
+            pyxel.rect(self.ego_vx-12, self.ego_vy-17, 50, 13, 13)
+            pyxel.text(self.ego_vx-10, self.ego_vy-15, "ORIRU?[Y/N]", 7)
+
+            # ゲームタイトルの描画            
+            pyxel.text(5, 5, self.name,  7) 
+            pyxel.text(50, 5, f"{self.floor}F",  7) 
+
         elif self.state == State.CHANGE:
             pyxel.cls(0)
             pyxel.text(5, 5, self.name,  7) 
@@ -448,6 +364,171 @@ class App:
             pyxel.cls(0)
             pyxel.text(0, 0, self.name, 7)
             pyxel.text(5, int(pyxel.height/2.0), "GAME OVER",  7 )            
+
+    def draw_small_map(self):
+
+        # スモールマップの描画みたことあるところだけ描画
+        smap_margin = 15 # [pix]
+        for i in range(self.map.w):
+            for j in range(self.map.h):                                                
+                x = i + smap_margin
+                y = j + smap_margin   
+                if self.map.data[j, i] == 0:
+                    if self.is_seen[j, i] == True:
+                        pyxel.rect(x, y, 1, 1, 5)
+                    else:
+                        pass
+                        # pyxel.rect(x, y, 1, 1, 12)
+
+        # スモールマップの自キャラと視野範囲の描画
+        _, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
+        lsmx, rsmx, usmy, dsmy = self.margins
+        cx = int(self.ego.x)
+        cy = int(self.ego.y)
+        pyxel.rect (cx + smap_margin, cy + smap_margin, 1,  1, 11)
+        pyxel.rectb(cx - lsmx + smap_margin, cy - usmy + 15, 16, 16, 8)
+
+
+    def draw_enemy(self):
+        self.ene_vx = self.ego_vx + (self.enemy.x - self.ego.x) * 16
+        self.ene_vy = self.ego_vy + (self.enemy.y - self.ego.y) * 16
+
+        # localでの自キャラとの相対位置計算
+        # pyxel.rect(self.ene_vx, self.ene_vy, 16, 16, 8) 
+        if self.tick % 3 == 0:
+            pyxel.blt(self.ene_vx, self.ene_vy, 0, 96, 32, 16, 16, 0)
+        else:
+            pyxel.blt(self.ene_vx, self.ene_vy, 0, 96, 48, 16, 16, 0)
+
+    def draw_ego(self):
+
+        # 基本は画面中央で、画面端のときだけ視覚中央からはずれる            
+        self.ego_vx = self.margins[0] * 16 
+        self.ego_vy = self.margins[2] * 16
+
+        # pyxel.rect(self.ego_vx, self.ego_vy, 16, 16, 11)  
+        self.draw_vehicle(self.ego_vx, self.ego_vy)        
+
+        # 攻撃の描画
+        x = y = None
+        if self.ego.attacked:
+            if self.ego.d == Direction.UP:
+                x = self.ego_vx 
+                y = self.ego_vy-16
+                s = 112
+                w = 16
+                h = -16
+                
+                # pyxel.circb(self.ego_vx+8, self.ego_vy+8-16, 8, 7)  
+            elif self.ego.d == Direction.RIGHT:
+                x = self.ego_vx+16
+                y = self.ego_vy
+                s = 128
+                w = 16
+                h = 16
+
+                # pyxel.circb(self.ego_vx+8+16, self.ego_vy+8, 8, 7)  
+            elif self.ego.d == Direction.DOWN:
+                x = self.ego_vx 
+                y = self.ego_vy+16
+                s = 112
+                w = 16
+                h = 16
+
+                # pyxel.blt(self.ego_vx, self.ego_vy+16, 0, 112, 48, 16, 16)
+                # pyxel.circb(self.ego_vx+8, self.ego_vy+8+16, 8, 7)  
+            elif self.ego.d == Direction.LEFT:
+                x = self.ego_vx-16
+                y = self.ego_vy
+                s = 128
+                w = -16
+                h = 16
+
+                # pyxel.circb(self.ego_vx+8-16, self.ego_vy+8, 8, 7)  
+            if x is not None and y is not None:
+                pyxel.blt(x, y, 0, s, 48, w, h, 0)
+                pyxel.play(0, [0])                
+                self.ego.attacked = False
+
+
+    def draw_map(self):
+        # 地図の描画
+        for i in range(16):
+            for j in range(16):
+                x = i * 16
+                y = j * 16
+                
+                tile_type = self.tile_info_map[j, i]
+                if tile_type == 1:
+                    draw_tile(x, y, TyleType.WALL_IN_UP)
+
+                elif tile_type == 2:
+                    draw_tile(x, y, TyleType.WALL_IN_DOWN)
+                    
+                elif tile_type == 3:
+                    draw_tile(x, y, TyleType.WALL_IN_LEFT)
+
+                elif tile_type == 4:
+                    draw_tile(x, y, TyleType.WALL_IN_RIGHT)
+                
+                elif tile_type == 5:
+                    draw_tile(x, y, TyleType.WALL_IN_UL_CORNER)
+
+                elif tile_type == 6:
+                    draw_tile(x, y, TyleType.WALL_IN_DL_CORNER)
+
+                elif tile_type == 7:
+                    draw_tile(x, y, TyleType.WALL_IN_UR_CORNER)
+
+                elif tile_type == 8:
+                    draw_tile(x, y, TyleType.WALL_IN_DR_CORNER)
+                # -----
+                elif tile_type == 9:
+                    draw_tile(x, y, TyleType.WALL_OUT_UP)
+
+                elif tile_type == 10:
+                    draw_tile(x, y, TyleType.WALL_OUT_DOWN)
+
+                elif tile_type == 11:
+                    draw_tile(x, y, TyleType.WALL_OUT_LEFT)
+
+                elif tile_type == 12:
+                    draw_tile(x, y, TyleType.WALL_OUT_RIGHT)
+
+                elif tile_type == 13:
+                    draw_tile(x, y, TyleType.WALL_OUT_UL_CORNER)
+
+                elif tile_type == 14:
+                    draw_tile(x, y, TyleType.WALL_OUT_DL_CORNER)
+
+                elif tile_type == 15:
+                    draw_tile(x, y, TyleType.WALL_OUT_UR_CORNER)
+
+                elif tile_type == 16:
+                    draw_tile(x, y, TyleType.WALL_OUT_DR_CORNER)
+                    
+                # elif tile_type == 17:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_H_CENTER)
+
+                # elif tile_type == 18:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_V_CENTER)
+
+                # elif tile_type == 19:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_LEFT)
+                    
+                # elif tile_type == 20:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_RIGHT)
+                    
+                # elif tile_type == 21:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_UP)
+                # elif tile_type == 22:
+                #     draw_tile(x, y, TyleType.WALL_CORRIDER_DOWN)
+                    
+                elif tile_type == 23:
+                    draw_tile(x, y, TyleType.GOAL)
+                
+                else:
+                    pass
 
 
     def draw_vehicle(self, x, y):
@@ -482,8 +563,11 @@ class App:
         elif self.ego.d == Direction.UPRIGHT:
             bltx = 16*7 
             blty = 0
-            
-        pyxel.blt(x, y, 0, 112, 32, 16, 16)
+
+        if self.tick %2 == 0:
+            pyxel.blt(x, y, 0, 96, 64, 16, 16)
+        else:
+            pyxel.blt(x, y, 0, 96, 80, 16, 16)
         # pyxel.blt(x, y, 0, bltx, blty, bltw, blth)
 
     def act_enemy(self):
@@ -494,15 +578,22 @@ class App:
         cx = self.ego.x
         
         # 最短経路の更新
-        if not pyxel.frame_count % 15:
+        if not pyxel.frame_count % 1:
                 
             self.route = self.map.search_shortest_path_dws((ey, ex), (cy, cx))
             self.route = deque(self.route)
             self.route.popleft() # 一つ目はstartなので捨てる
+            # self.route.pop() # 最後は自分キャラ
+            
 
         if len(self.route) > 0:
             next_cell = self.route.popleft()
-            self.enemy.update(int(next_cell[1]), int(next_cell[0]))
+
+            # 重なることはしない
+            if next_cell[1] == self.ego.x and next_cell[0] == self.ego.y:
+                pass
+            else: 
+                self.enemy.update(int(next_cell[1]), int(next_cell[0]))
 
         else:
             pass
