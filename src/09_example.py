@@ -16,7 +16,11 @@ class State(Enum):
   QUESTION = 4
   CHANGE = 5 # マップ切り替え
   END = 6 # 終了
-  
+
+class Turn(Enum):
+    EGO = 1
+    ENEMY = 2
+    WAIT = 3
 
 class Direction(Enum):
     UP = 1,
@@ -58,6 +62,7 @@ class App:
         
         # ゲームの状態
         self.state = State.START
+        self.turn = Turn.EGO
 
         # ゲームの設定
         pyxel.init(256, 256, caption=self.name, scale=2, fps=10)
@@ -71,7 +76,8 @@ class App:
         pyxel.sound(3).set("A3", "T", "3", "F", 20) # 敵の攻撃
         
         # 画面切り替え時間
-        self.change_view_timer = 13# [frames] 1secくらいまつ        
+        self.change_view_timer = 13# [frames] 1secくらいまつ    
+        self.change_turn_timer = 6# [frames]    
         
         # フロア
         self.floor = 0 # [F]
@@ -210,51 +216,63 @@ class App:
         
         elif self.state == State.MAIN:                
 
-            
-            # 自キャラの操作うけつけ
-            if not self.ego.moved:
-                if (pyxel.btn(pyxel.KEY_W)):
-                    self.ego.moved = True
-                    self.ego.attacked = True
-                    attacked_cell = [self.ego.x, self.ego.y]
-                    if self.ego.d == Direction.UP:
-                        dx = 0
-                        dy = -1
-                    elif self.ego.d == Direction.RIGHT:
-                        dx = 1
-                        dy = 0
-                    elif self.ego.d == Direction.DOWN:
-                        dx = 0
-                        dy = 1
-                    elif self.ego.d == Direction.LEFT:
-                        dx = -1
-                        dy = 0
-                    attacked_cell[0] += dx
-                    attacked_cell[1] += dy
-            
-            if not self.ego.moved:
-                self.move_target(self.ego)
+            if self.turn == Turn.EGO:
+                # 自キャラの操作うけつけ
+                # 攻撃するか移動するか(道具をつかうかなど。)
+                if not self.ego.moved:
+                    if (pyxel.btn(pyxel.KEY_W)):
+                        self.ego.moved = True
+                        self.ego.attacked = True
+                        attacked_cell = [self.ego.x, self.ego.y]
+                        if self.ego.d == Direction.UP:
+                            dx = 0
+                            dy = -1
+                        elif self.ego.d == Direction.RIGHT:
+                            dx = 1
+                            dy = 0
+                        elif self.ego.d == Direction.DOWN:
+                            dx = 0
+                            dy = 1
+                        elif self.ego.d == Direction.LEFT:
+                            dx = -1
+                            dy = 0
+                        attacked_cell[0] += dx
+                        attacked_cell[1] += dy
+                
+                if not self.ego.moved:
+                    self.move_target(self.ego)
+
+                # 攻撃の結果を更新
+                if self.ego.attacked:
+                    if self.enemy.x == attacked_cell[0] and self.enemy.y == attacked_cell[1]:
+                        # 敵の体力を減らす
+                        self.enemy.hitpoints -= 3    
+                        pyxel.play(3, [2]) # 攻撃があたる音
+                        
+                if self.ego.moved:
+                    self.turn = Turn.WAIT                        
+
+            if self.turn == Turn.ENEMY:
+
+                # 敵キャラの行動
+                if self.enemy.hitpoints > 0:
+                    if self.ego.moved == True:
+                        self.act_enemy()                        
+                        
+                    if self.enemy.attacked:
+                        pyxel.play(3, [3]) # 攻撃があたる音
+                        self.ego.hitpoints -= 1
+                        self.enemy.attacked = False
+                        
+                self.turn = Turn.EGO
+
+            if self.turn == Turn.WAIT:
+                self.change_turn_timer -= 1
+                if self.change_turn_timer == 0:
+                    self.turn = Turn.ENEMY
 
             # 画面内に表示される分だけのローカル地図
             self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
-
-            # 攻撃の結果を更新
-            if self.ego.attacked:
-                if self.enemy.x == attacked_cell[0] and self.enemy.y == attacked_cell[1]:
-                    # 敵の体力を減らす
-                    self.enemy.hitpoints -= 3    
-                    pyxel.play(3, [2]) # 攻撃があたる音
-
-            # 敵キャラの行動
-            if self.enemy.hitpoints > 0:
-                if self.ego.moved == True:
-                    self.act_enemy()                        
-                    
-                if self.enemy.attacked:
-                    pyxel.play(3, [3]) # 攻撃があたる音
-                    self.ego.hitpoints -= 1
-                    self.enemy.attacked = False
-                    
                     
             # 探索済みのフラグ更新
             cx = int(self.ego.x)
