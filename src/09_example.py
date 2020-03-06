@@ -46,13 +46,17 @@ class Man:
         self.d = _d # 描画用の方向
         self.moved = False
         self.attacked = False
-
         self.hitpoints = _hp
-
+        self.alive = True
 
     def update(self, _x, _y):
         self.x = _x
         self.y = _y
+        
+    def kill(self):
+        self.x = -255
+        self.x = -255
+        self.alive = False
 
 class App:
     def __init__(self):
@@ -249,18 +253,24 @@ class App:
                         self.enemy.hitpoints -= 3    
                         pyxel.play(3, [2]) # 攻撃があたる音
                         
-                if self.ego.moved:
-                    self.turn = Turn.WAIT                        
+                        # 敵の体力が0以下なら、殺す
+                        if self.enemy.hitpoints <= 0:
+                            self.enemy.kill()
+                        
+                        
+                if self.ego.moved and self.ego.attacked:
+                    self.turn = Turn.WAIT           
+                elif self.ego.moved:
+                    self.turn = Turn.ENEMY
 
             if self.turn == Turn.ENEMY:
 
                 # 敵キャラの行動
                 if self.enemy.hitpoints > 0:
-                    if self.ego.moved == True:
-                        self.act_enemy()                        
+                    self.act_enemy()                        
                         
                     if self.enemy.attacked:
-                        pyxel.play(3, [3]) # 攻撃があたる音
+                        pyxel.play(3, [2]) # 攻撃があたる音
                         self.ego.hitpoints -= 1
                         self.enemy.attacked = False
                         
@@ -270,6 +280,7 @@ class App:
                 self.change_turn_timer -= 1
                 if self.change_turn_timer == 0:
                     self.turn = Turn.ENEMY
+                    self.change_turn_timer = 6
 
             # 画面内に表示される分だけのローカル地図
             self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
@@ -291,10 +302,12 @@ class App:
             if self.map.data[cy, cx] == -1:
                 self.state = State.QUESTION
 
+            # 死亡判定
+            if self.ego.hitpoints <= 0:
+                self.state = State.END
 
             # updateの最後に自キャラの行動フラグをクリア
             self.ego.moved = False
-
             
 
         elif self.state == State.QUESTION:
@@ -720,6 +733,10 @@ class App:
             if self.map.data[int(my+ms), int(mx+ms)] != 1:
                 self.ego.d = Direction.DOWNRIHGHT
                 
-        target.update(mx, my)
+        # 敵とかさなるなら動かない
+        if mx == self.enemy.x and my == self.enemy.y:        
+            target.moved = False # クリア
+        else:
+            target.update(mx, my)
 
 App()
