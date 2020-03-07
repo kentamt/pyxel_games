@@ -38,22 +38,38 @@ def draw_tile(x, y, tile_type):
 
     
 class Man:
-    def __init__(self, _x, _y, _c, _d=Direction.UP, _hp=10):
+    def __init__(self, _x, _y, _c, _d=Direction.UP, hitpoints=10, max_hitpoints=10):
         super().__init__()
         self.x = _x
         self.y = _y
+        self.px = None
+        self.py = None # 一回前の座標
         self.c = _c # 色
         self.d = _d # 描画用の方向
         self.moved = False
         self.attacked = False
-        self.hitpoints = _hp
+        self.hitpoints = hitpoints
+        self.max_hp = max_hitpoints
         self.alive = True
         self.vx = None 
         self.vy = None
+        self.hunger = 100
+        self.step_count = 0
+        self.attack_motion_timer = 3  # [frames]
+        self.lv = 1
+        self.exp = 0
 
     def update(self, _x, _y):
+        
+        self.px = self.x
+        self.py = self.y        
         self.x = _x
         self.y = _y
+        
+        
+        if self.step_count % 10 == 0:
+            self.step_count += 1
+            self.hunger -= 1
 
     def kill(self):
         self.x = -255
@@ -61,10 +77,11 @@ class Man:
         self.alive = False
 
 class Enemy(Man):
-    def __init__(self, _x, _y, _c, _d=Direction.UP, _hp=10):
-        super().__init__(_x, _y, _c, _d=_d, _hp=_hp)
+    def __init__(self, _x, _y, _c, _d=Direction.UP, hitpoints=10, max_hitpoints=10, exp=1):
+        super().__init__(_x, _y, _c, _d=_d, hitpoints=hitpoints, max_hitpoints=max_hitpoints)
         self.route = None
-    
+        self.exp = exp
+
     def set_route(self, _route):
         self.route = _route
     
@@ -73,27 +90,31 @@ class App:
     def __init__(self):
 
         # ゲームの名前
-        self.name = "07_example"
+        self.name = "09_example"
         
         # ゲームの状態
         self.state = State.START
         self.turn = Turn.EGO
 
         # ゲームの設定
-        pyxel.init(256, 256, caption=self.name, scale=2, fps=10)
+        palette=[0x000000, 0x1D2B53, 0x7E2553, 0x008751, 0xAB5236, 
+                 0x4F473F, 0xC2C3C7, 0xFFF1E8, 0xFF004D, 0xFFA300, 
+                 0xFFEC27, 0x00E436, 0x29ADFF, 0x63567C, 0xFF77A8, 0xDDAA88]
+        pyxel.init(256, 256, caption=self.name, scale=2, fps=15, palette=palette)
         pyxel.load("my_resource.pyxres")
+        pyxel.playm(0, loop=True)        
         
         # SE
-        pyxel.sound(0).set("A3", "N", "3", "F", 20) # 剣を振る
-        pyxel.sound(1).set("F2RRF2RRF2RRF2RR", "N", "6", "F", 10) # 階段
-        pyxel.sound(2).set("C1", "N", "6", "F", 15) # 攻撃があたる
-        # pyxel.sound(3).set("D", "N", "6", "F", 30) # 敵が死ぬ
-        pyxel.sound(3).set("A3", "T", "3", "F", 20) # 敵の攻撃
+        pyxel.sound(10).set("A3", "N", "3", "F", 20) # 剣を振る
+        pyxel.sound(11).set("F2RRF2RRF2RRF2RR", "N", "6", "F", 10) # 階段
+        pyxel.sound(12).set("C1", "N", "6", "F", 15) # 攻撃があたる
+        pyxel.sound(13).set("A3", "T", "3", "F", 20) # 敵の攻撃
         
         # 画面切り替え時間
         self.change_view_timer = 13# [frames] 1secくらいまつ    
         self.change_turn_timer = 6# [frames]    
         
+
         # フロア
         self.floor = 0 # [F]
 
@@ -115,16 +136,17 @@ class App:
 
         # 見たことある場所
         self.is_seen = np.zeros((self.map.h, self.map.w), dtype=bool)
+        self.occupancy = np.zeros((self.map.h, self.map.w), dtype=bool) # キャラとかアイテムがある場所
         
         # 自キャラの初期化, map.dataの16倍の位置
         yx = self.map.get_free_space(num=1)
-        self.ego = Man(yx[1], yx[0], 11, Direction.UP) 
+        self.ego = Man(yx[1], yx[0], 11, Direction.UP, hitpoints=50, max_hitpoints=50) 
 
         # 敵キャラの配置
         self.enemies = []
-        for _ in range(1):
+        for _ in range(4):
             yx = self.map.get_free_space(num=1)
-            enemy = Enemy(yx[1], yx[0], 14, Direction.UP) 
+            enemy = Enemy(yx[1], yx[0], 14, Direction.UP, hitpoints=9, max_hitpoints=9) 
             enemy.set_route(deque())
             self.enemies.append(enemy)
 
@@ -236,6 +258,7 @@ class App:
         
         elif self.state == State.MAIN:                
 
+    
             if self.turn == Turn.EGO:
                 # 自キャラの操作うけつけ
                 # 攻撃するか移動するか(道具をつかうかなど。)
@@ -265,15 +288,19 @@ class App:
                 # 攻撃の結果を更新
                 if self.ego.attacked:
                     
-                    for enemy in self.enemies:                        
+                    for idx, enemy in enumerate(self.enemies):                        
                         if enemy.x == attacked_cell[0] and enemy.y == attacked_cell[1]:
                             # 敵の体力を減らす
-                            enemy.hitpoints -= 3    
-                            pyxel.play(3, [2]) # 攻撃があたる音
+                            enemy.hitpoints -= 8    
+                            pyxel.play(3, [12]) # 攻撃があたる音
                             
                             # 敵の体力が0以下なら、殺す
                             if enemy.hitpoints <= 0:
+                                self.occupancy[enemy.y, enemy.x] = False # 殺す前に解放
                                 enemy.kill()# TODO: リストからの削除をすること
+                                self.ego.exp += enemy.exp
+                                del self.enemies[idx] # TODO: デストラクでOCCを解放したい
+                                
                         
                         
                 if self.ego.moved and self.ego.attacked:
@@ -284,15 +311,16 @@ class App:
             if self.turn == Turn.ENEMY:
 
                 # 敵キャラの行動
+                # TODO 順番にうごいてほしい                
                 for enemy in self.enemies:
                     if enemy.hitpoints > 0:
                         self.act_enemy(enemy)                        
                         
                         if enemy.attacked:
-                            pyxel.play(3, [2]) # 攻撃があたる音
+                            pyxel.play(3, [12]) # 攻撃があたる音
                             self.ego.hitpoints -= 1
-                            enemy.attacked = False
-                        
+                            # enemy.attacked = False
+                                                            
                 self.turn = Turn.EGO
 
             if self.turn == Turn.WAIT:
@@ -318,7 +346,7 @@ class App:
                 self.tick += 1
       
             # ゴール判定
-            if self.map.data[cy, cx] == -1:
+            if self.map.data[cy, cx] == -1 and self.map.data[self.ego.py, self.ego.px] != -1:
                 self.state = State.QUESTION
 
             # 死亡判定
@@ -332,9 +360,9 @@ class App:
         elif self.state == State.QUESTION:
             if (pyxel.btn(pyxel.KEY_Y)):                    
                 self.state = State.CHANGE
-                pyxel.play(1, [1]) # 階段をおりる音
+                pyxel.play(3, [11]) # 階段をおりる音
             elif (pyxel.btn(pyxel.KEY_N)):                    
-                self.state = State.MAIN
+                self.state = State.MAIN 
       
         elif self.state == State.CHANGE:
 
@@ -359,27 +387,27 @@ class App:
             
             # 自キャラの初期化, map.dataの16倍の位置
             yx = self.map.get_free_space(num=1)
-            self.ego = Man(yx[1], yx[0], 11, Direction.UP) 
-
-            # 敵キャラ
-            # yx = self.map.get_free_space(num=1)
-            # self.enemy = Man(yx[1], yx[0], 14, Direction.UP) 
-            # self.route = deque()
-
+            self.ego.update(yx[1], yx[0])
+        
             # 敵キャラの配置
             self.enemies = []
-            for _ in range(1):
+            for _ in range(4):
                 yx = self.map.get_free_space(num=1)
                 enemy = Enemy(yx[1], yx[0], 14, Direction.UP) 
                 enemy.set_route(deque())
                 self.enemies.append(enemy)
 
-
             # 自分両中心で描画可能な範囲だけを取り出しち地図と、その左右上下のマージン
             self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
 
-            self.floor += 1
+            self.ego.vx = self.margins[0] * 16 
+            self.ego.vy = self.margins[2] * 16
+            for ene in self.enemies:
+                ene.vx = self.ego.vx + (ene.x - self.ego.x) * 16
+                ene.vy = self.ego.vy + (ene.y - self.ego.y) * 16
 
+
+            self.floor += 1
             self.state = State.MAIN
       
         elif self.state == State.END:
@@ -393,9 +421,12 @@ class App:
         
         if self.state == State.START:
             pyxel.cls(0)
+            
+            pyxel.bltm(30, 30, 0, 0, 0, 22, 25)
+            
             pyxel.text(0, 0, self.name, 7)
-            pyxel.text(20, 20, "LOW RISK WARRIOR TAKACHI'S MISTERY DUNGEON",  7)      
-            pyxel.text(40, 74, "PRESS S TO START",  7)      
+            # pyxel.text(20, 20, "LOW RISK WARRIOR TAKACHI'S MISTERY DUNGEON",  7)      
+            pyxel.text(80, 230, "PRESS S TO START",  7)      
 
         elif self.state == State.MAIN:
         
@@ -409,14 +440,17 @@ class App:
             # 地図の描画
             self.draw_map()
             
+
             # 自キャラの描画
             self.draw_ego()
+
 
             # 敵キャラの描画
             for enemy in self.enemies:
                 if enemy.hitpoints > 0:
                     self.draw_enemy(enemy)
-            
+
+
             # スモールマップの描画
             self.draw_small_map()            
 
@@ -427,7 +461,13 @@ class App:
             pyxel.text(50, 5, f"{self.floor}F",  7) 
             
             # 体力
-            pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/10",  7) 
+            pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
+            
+            # 経験値
+            pyxel.text(120, 5, f"Exp: {self.ego.exp}",  7) 
+            
+            # 満腹度
+            # pyxel.text(90, 5, f"Hunger: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
 
         elif self.state == State.QUESTION:
 
@@ -491,19 +531,54 @@ class App:
 
 
     def draw_enemy(self, enemy):
+        
+        # localでの自キャラとの相対位置計算
         enemy.vx = self.ego.vx + (enemy.x - self.ego.x) * 16
         enemy.vy = self.ego.vy + (enemy.y - self.ego.y) * 16
+        
+        if enemy.attacked:
+            
+                    
+            enemy.vy = self.ego.vy + (enemy.y - self.ego.y) * 16 - (enemy.y - self.ego.y) * 8
+            enemy.vx = self.ego.vx + (enemy.x - self.ego.x) * 16 - (enemy.x - self.ego.x) * 8
+            enemy.attack_motion_timer -= 1
+            
+            if enemy.attack_motion_timer == 0:
+                enemy.attacked = False
+                enemy.attack_motion_timer = 3 # [frames]
+         
+        x = enemy.vx
+        y = enemy.vy   
+        if enemy.d == Direction.UP:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 112, 96, 16, 16, 0)
+            else:
+                pyxel.blt(x, y, 0, 112, 112, 16, 16, 0)
 
-        # localでの自キャラとの相対位置計算
-        # pyxel.rect(self.ene_vx, self.ene_vy, 16, 16, 8) 
-        if self.tick % 3 == 0:
-            pyxel.blt(enemy.vx, enemy.vy, 0, 96, 32, 16, 16, 0)
-        else:
-            pyxel.blt(enemy.vx, enemy.vy, 0, 96, 48, 16, 16, 0)
+        elif enemy.d == Direction.RIGHT:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 128, 96, -16, 16, 0)
+            else:
+                pyxel.blt(x, y, 0, 128, 112, -16, 16, 0)
+            
+        elif enemy.d == Direction.DOWN:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 96, 96, 16, 16, 0)
+            else:
+                pyxel.blt(x, y, 0, 96, 112, 16, 16, 0)
+
+        elif enemy.d == Direction.LEFT:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 128, 96, 16, 16, 0)
+            else:
+                pyxel.blt(x, y, 0, 128, 112, 16, 16, 0)
+
+        
 
         # HPの表示
-        pyxel.text(enemy.vx, enemy.vy-5, f"{enemy.hitpoints}/10", 7)
-
+        # pyxel.text(enemy.vx, enemy.vy-5, f"{enemy.hitpoints}/{enemy.max_hp}", 7)
+        # バーでぼ描画
+        pyxel.rect(enemy.vx, enemy.vy-5, int((enemy.hitpoints/enemy.max_hp)*16), 1, 8)
 
     def draw_ego(self):
 
@@ -511,49 +586,57 @@ class App:
         self.ego.vx = self.margins[0] * 16 
         self.ego.vy = self.margins[2] * 16
 
-        # pyxel.rect(self.ego.vx, self.ego.vy, 16, 16, 11)  
-        self.draw_vehicle(self.ego.vx, self.ego.vy)        
-
+        ex = self.ego.vx
+        ey = self.ego.vy
+        
         # 攻撃の描画
         x = y = None
         if self.ego.attacked:
             if self.ego.d == Direction.UP:
                 x = self.ego.vx 
                 y = self.ego.vy-16
+                ex = ex
+                ey = ey - 4
                 s = 112
                 w = 16
                 h = -16
                 
-                # pyxel.circb(self.ego.vx+8, self.ego.vy+8-16, 8, 7)  
             elif self.ego.d == Direction.RIGHT:
                 x = self.ego.vx+16
                 y = self.ego.vy
+                ex = ex + 4
+                ey = ey
                 s = 128
                 w = 16
                 h = 16
 
-                # pyxel.circb(self.ego.vx+8+16, self.ego.vy+8, 8, 7)  
             elif self.ego.d == Direction.DOWN:
                 x = self.ego.vx 
                 y = self.ego.vy+16
+                ex = ex
+                ey = ey + 4
                 s = 112
                 w = 16
                 h = 16
 
-                # pyxel.blt(self.ego.vx, self.ego.vy+16, 0, 112, 48, 16, 16)
-                # pyxel.circb(self.ego.vx+8, self.ego.vy+8+16, 8, 7)  
             elif self.ego.d == Direction.LEFT:
                 x = self.ego.vx-16
                 y = self.ego.vy
+                ex = ex - 4
+                ey = ey
                 s = 128
                 w = -16
                 h = 16
 
-                # pyxel.circb(self.ego.vx+8-16, self.ego.vy+8, 8, 7)  
             if x is not None and y is not None:
                 pyxel.blt(x, y, 0, s, 48, w, h, 0)
-                pyxel.play(0, [0])                
-                self.ego.attacked = False
+                self.ego.attack_motion_timer -= 1
+                if self.ego.attack_motion_timer == 0:
+                    pyxel.play(3, [10])                         
+                    self.ego.attacked = False
+                    self.ego.attack_motion_timer = 3 # [frames]
+
+        self.draw_warrior(ex, ey)        
 
 
     def draw_map(self):
@@ -636,44 +719,36 @@ class App:
                     pass
 
 
-    def draw_vehicle(self, x, y):
+    def draw_warrior(self, x, y):
         bltx = 0
         blty = 0
         bltw = 16
         blth = 16
-        if self.ego.d == Direction.DOWN:
-            if self.tick % 2 == 0:
-                bltx = 16*0
-            else:
-                bltx = 16*8
-            blty = 0
-        elif self.ego.d == Direction.UP:
-            bltx = 16*1
-            blty = 0
-        elif self.ego.d == Direction.RIGHT:
-            bltx = 16*2
-            blty = 0
-        elif self.ego.d == Direction.LEFT:
-            bltx = 16*3
-            blty = 0
-        elif self.ego.d == Direction.DOWNRIHGHT:
-            bltx = 16*4
-            blty = 0
-        elif self.ego.d == Direction.DOWNLEFT:
-            bltx = 16*5 
-            blty = 0
-        elif self.ego.d == Direction.UPLEFT:
-            bltx = 16*6 
-            blty = 0
-        elif self.ego.d == Direction.UPRIGHT:
-            bltx = 16*7 
-            blty = 0
 
-        if self.tick %2 == 0:
-            pyxel.blt(x, y, 0, 96, 64, 16, 16)
-        else:
-            pyxel.blt(x, y, 0, 96, 80, 16, 16)
-        # pyxel.blt(x, y, 0, bltx, blty, bltw, blth)
+        if self.ego.d == Direction.UP:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 112, 64, 16, 16,0)
+            else:
+                pyxel.blt(x, y, 0, 112, 80, 16, 16,0)
+
+        elif self.ego.d == Direction.RIGHT:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 128, 64, -16, 16,0)
+            else:
+                pyxel.blt(x, y, 0, 128, 80, -16, 16,0)
+            
+        elif self.ego.d == Direction.DOWN:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 96, 64, 16, 16,0)
+            else:
+                pyxel.blt(x, y, 0, 96, 80, 16, 16,0)
+
+        elif self.ego.d == Direction.LEFT:
+            if self.tick %2 == 0:
+                pyxel.blt(x, y, 0, 128, 64, 16, 16,0)
+            else:
+                pyxel.blt(x, y, 0, 128, 80, 16, 16,0)
+
 
     def act_enemy(self, enemy):
         
@@ -693,14 +768,34 @@ class App:
 
         if len(enemy.route) > 0:
             next_cell = enemy.route.popleft()
-
-            # 重なることはしない
+            x = next_cell[1]
+            y = next_cell[0]
+            
+            # 敵味方アイテムと重なることはしない TODO: 現時点では敵同士はかさなる。判定はOCCUPIED_MAPをつくって管理すること
             # もし隣接していれば敵の攻撃
-            if next_cell[1] == self.ego.x and next_cell[0] == self.ego.y:
+            if x == self.ego.x and y == self.ego.y:
                 enemy.attacked = True
-            else: 
-                enemy.update(int(next_cell[1]), int(next_cell[0]))
-
+                
+            # 占有されていなければ動く
+            elif self.occupancy[y, x] == False:
+                
+                d = Direction.DOWN
+                dx = x - enemy.x
+                dy = y - enemy.y
+                if dx == 0 and dy == -1:
+                    d = Direction.UP
+                elif dx == 1 and dy == 0:
+                    d = Direction.RIGHT
+                elif dx == 0 and dy == 1:
+                    d = Direction.DOWN
+                elif dx == -1 and dy == 0:
+                    d = Direction.LEFT
+                    
+                enemy.d = d
+                self.occupancy[enemy.y, enemy.x] = False # 占有
+                enemy.update(x, y)
+                self.occupancy[enemy.y, enemy.x] = True # 占有
+                
         else:
             pass
 
@@ -747,21 +842,21 @@ class App:
                 else:
                     self.ego.d = Direction.DOWN
         
-        if pyxel.btn(pyxel.KEY_LEFT) and pyxel.btn(pyxel.KEY_UP):
-            if self.map.data[int(my-ms), int(mx-ms)] != 1:
-                self.ego.d = Direction.UPLEFT
+        # if pyxel.btn(pyxel.KEY_LEFT) and pyxel.btn(pyxel.KEY_UP):
+        #     if self.map.data[int(my-ms), int(mx-ms)] != 1:
+        #         self.ego.d = Direction.UPLEFT
             
-        if pyxel.btn(pyxel.KEY_LEFT) and pyxel.btn(pyxel.KEY_DOWN):
-            if self.map.data[int(my+ms), int(mx-ms)] != 1:
-                self.ego.d = Direction.DOWNLEFT
+        # if pyxel.btn(pyxel.KEY_LEFT) and pyxel.btn(pyxel.KEY_DOWN):
+        #     if self.map.data[int(my+ms), int(mx-ms)] != 1:
+        #         self.ego.d = Direction.DOWNLEFT
 
-        if pyxel.btn(pyxel.KEY_RIGHT) and pyxel.btn(pyxel.KEY_UP):
-            if self.map.data[int(my-ms), int(mx+ms)] != 1:
-                self.ego.d = Direction.UPRIGHT
+        # if pyxel.btn(pyxel.KEY_RIGHT) and pyxel.btn(pyxel.KEY_UP):
+        #     if self.map.data[int(my-ms), int(mx+ms)] != 1:
+        #         self.ego.d = Direction.UPRIGHT
 
-        if pyxel.btn(pyxel.KEY_RIGHT) and pyxel.btn(pyxel.KEY_DOWN):
-            if self.map.data[int(my+ms), int(mx+ms)] != 1:
-                self.ego.d = Direction.DOWNRIHGHT
+        # if pyxel.btn(pyxel.KEY_RIGHT) and pyxel.btn(pyxel.KEY_DOWN):
+        #     if self.map.data[int(my+ms), int(mx+ms)] != 1:
+        #         self.ego.d = Direction.DOWNRIHGHT
                 
         # 敵とかさなるなら動かない
         # ひとつでもかさなて敵がみつかればそこで関数をぬける
@@ -769,7 +864,9 @@ class App:
             if mx == enemy.x and my == enemy.y:        
                 target.moved = False # クリア
                 return
-                
+        
+        self.occupancy[target.y, target.x] = False # 解放               
         target.update(mx, my)
+        self.occupancy[target.y, target.x] = True # 占有
 
 App()
