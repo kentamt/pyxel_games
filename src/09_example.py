@@ -48,24 +48,29 @@ class Man:
         self.y = _y
         self.px = None
         self.py = None # 一回前の座標
-        self.c = _c # 色
-        self.d = _d # 描画用の方向
-        self.moved = False
-        self.attacked = False
-        self.hitpoints = hitpoints
-        self.max_hp = max_hitpoints
-        self.alive = True
         self.vx = None 
         self.vy = None
-        self.hunger = 100
+        self.c = _c # 色
+        self.d = _d # 描画用の方向
+        
+        # Flags
+        self.moved = False
+        self.attacked = False
+        self.alive = True
         self.step_count = 0
+        
+        # Draw
         self.attack_motion_timer = 3  # [frames]
         
-        self.strength = 5
-        self.defense = 5        
-        
+        # Ability
         self.lv = 1
         self.exp = 0
+        self.strength = 5
+        self.defense = 5        
+        self.hitpoints = hitpoints
+        self.max_hp = max_hitpoints
+        self.hunger = 100        
+        
 
     def update(self, _x, _y):
         
@@ -73,20 +78,34 @@ class Man:
         self.py = self.y        
         self.x = _x
         self.y = _y
-        
-        
-        if self.step_count % 10 == 0:
-            self.step_count += 1
-            self.hunger -= 1
 
+        # TODO: 本来、　移動がなければupdate呼ばないほうがいい
+        if not (self.px == _x and self.py == _y):            
+            
+            # 満腹だと体力が回復する
+            if self.hunger > 0: 
+                if self.step_count % 13 == 1:
+                    self.hitpoints = self.hitpoints + 1 if self.hitpoints + 1 <= self.max_hp else self.hitpoints         
+
+            # 空腹だと体力が減る
+            else: 
+                if self.step_count % 13 == 1:
+                    self.hitpoints -= 1
+                self.step_count += 1
+
+            # 空腹度の減算            
+            self.step_count += 1            
+            if self.step_count % 11 == 1:        
+                self.hunger = self.hunger - 1 if self.hunger - 1 >= 0 else self.hunger
+
+                                        
     def level_up(self):
         self.lv += 1
         self.strength += np.random.randint(1,5)
         self.defense += np.random.randint(1,5)
         max_hp_up = np.random.randint(7,15)
         self.max_hp += max_hp_up
-        self.hitpoints += max_hp_up
-        
+        self.hitpoints += max_hp_up        
 
     def kill(self):
         self.x = -255
@@ -98,7 +117,8 @@ class Enemy(Man):
         super().__init__(_x, _y, _c, _d=_d, hitpoints=hitpoints, max_hitpoints=max_hitpoints)
         self.route = None
         self.exp = exp
-
+        self.id = np.random.randint(0,3)
+        
     def set_route(self, _route):
         self.route = _route
     
@@ -114,10 +134,7 @@ class App:
         self.turn = Turn.EGO
 
         # ゲームの設定
-        palette=[0x000000, 0x1D2B53, 0x7E2553, 0x008751, 0xAB5236, 
-                 0x4F473F, 0xC2C3C7, 0xFFF1E8, 0xFF004D, 0xFFA300, 
-                 0xFFEC27, 0x00E436, 0x29ADFF, 0x63567C, 0xFF77A8, 0xDDAA88]
-        pyxel.init(256, 256, caption=self.name, scale=2, fps=15, palette=palette)
+        pyxel.init(256, 256, caption=self.name, scale=2, fps=15)# , palette=palette)
         pyxel.load("my_resource.pyxres")
         pyxel.playm(0, loop=True)        
         
@@ -139,8 +156,8 @@ class App:
         self.tick = 0 
 
         # 地図
-        self.map = Maze(48, 48)
-        self.num_col_rooms = 2
+        self.map = Maze(64, 48)
+        self.num_col_rooms = 3
         self.num_row_rooms = 2
         self.corrider_width = 1
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
@@ -158,14 +175,17 @@ class App:
         # 自キャラの初期化, map.dataの16倍の位置
         yx = self.map.get_free_space(num=1)
         self.ego = Man(yx[1], yx[0], 11, Direction.UP, hitpoints=50, max_hitpoints=50) 
+        self.occupancy[yx[0], yx[1]] = True
 
         # 敵キャラの配置
+        self.num_enemies = np.random.randint(2, 5)
         self.enemies = []
-        for _ in range(4):
+        for _ in range(self.num_enemies):
             yx = self.map.get_free_space(num=1)
             enemy = Enemy(yx[1], yx[0], 14, Direction.UP, hitpoints=9, max_hitpoints=9) 
             enemy.set_route(deque())
             self.enemies.append(enemy)
+            self.occupancy[yx[0], yx[1]] = True
 
         # 自分中心で描画可能な範囲だけを取り出しち地図と、その左右上下のマージン
         self.local_data, self.margins = self.map.get_local_data(self.ego.y, self.ego.x)
@@ -404,15 +424,19 @@ class App:
 
             # 見たことある場所
             self.is_seen = np.zeros((self.map.h, self.map.w), dtype=bool)
+            self.occupancy = np.zeros((self.map.h, self.map.w), dtype=bool) # キャラとかアイテムがある場所
             
             # 自キャラの初期化, map.dataの16倍の位置
             yx = self.map.get_free_space(num=1)
             self.ego.update(yx[1], yx[0])
+            self.occupancy[yx[0], yx[1]] = True
         
             # 敵キャラの配置
             self.enemies = []
-            for _ in range(4):
+            self.num_enemies
+            for _ in range(self.num_enemies):
                 yx = self.map.get_free_space(num=1)
+                self.occupancy[yx[0], yx[1]] = True
                 enemy = Enemy(yx[1], yx[0], 14, Direction.UP) 
                 enemy.set_route(deque())
                 self.enemies.append(enemy)
@@ -425,7 +449,6 @@ class App:
             for ene in self.enemies:
                 ene.vx = self.ego.vx + (ene.x - self.ego.x) * 16
                 ene.vy = self.ego.vy + (ene.y - self.ego.y) * 16
-
 
             self.floor += 1
             self.state = State.MAIN
@@ -442,7 +465,7 @@ class App:
         if self.state == State.START:
             pyxel.cls(0)
             
-            pyxel.bltm(30, 30, 0, 0, 0, 22, 25)
+            # pyxel.bltm(30, 30, 0, 0, 0, 22, 25)
             
             pyxel.text(0, 0, self.name, 7)
             # pyxel.text(20, 20, "LOW RISK WARRIOR TAKACHI'S MISTERY DUNGEON",  7)      
@@ -483,16 +506,16 @@ class App:
             # 体力
             pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
             
-            # LV
-            pyxel.text(170, 5, f"Lv: {self.ego.lv}",  7) 
-            
             # 経験値
             pyxel.text(120, 5, f"Exp: {self.ego.exp}",  7) 
-            
-            
-            # 満腹度
-            # pyxel.text(90, 5, f"Hunger: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
 
+            # LV
+            pyxel.text(170, 5, f"Lv: {self.ego.lv}",  7) 
+
+            # 空腹度
+            pyxel.text(200, 5, f"Hunger: {self.ego.hunger}",  7) 
+            
+            
         elif self.state == State.QUESTION:
 
             pyxel.cls(0)
@@ -518,7 +541,21 @@ class App:
 
             # ゲームタイトルの描画            
             pyxel.text(5, 5, self.name,  7) 
+
+            # フロア
             pyxel.text(50, 5, f"{self.floor}F",  7) 
+            
+            # 体力
+            pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
+            
+            # 経験値
+            pyxel.text(120, 5, f"Exp: {self.ego.exp}",  7) 
+
+            # LV
+            pyxel.text(170, 5, f"Lv: {self.ego.lv}",  7) 
+
+            # 空腹度
+            pyxel.text(200, 5, f"Hunger: {self.ego.hunger}",  7) 
 
         elif self.state == State.CHANGE:
             pyxel.cls(0)
@@ -553,20 +590,49 @@ class App:
         pyxel.rect (cx + smap_margin, cy + smap_margin, 1,  1, 11)
         pyxel.rectb(cx - lsmx + smap_margin, cy - usmy + 15, 16, 16, 8)
 
+        # 敵の位置
+        for enemy in self.enemies:
+            ex = enemy.x
+            ey = enemy.y
+            pyxel.rect(ex + smap_margin, ey + smap_margin, 1,  1, 8)
+
+    def draw_enemy_effect(self, enemy):
+        
+        if enemy.id == 1: # スエゾー
+            pyxel.line(enemy.vx+8, enemy.vy+8, self.ego.vx+8, self.ego.vy+8, 10)
 
     def draw_enemy(self, enemy):
         
         # localでの自キャラとの相対位置計算
         enemy.vx = self.ego.vx + (enemy.x - self.ego.x) * 16
         enemy.vy = self.ego.vy + (enemy.y - self.ego.y) * 16
+
+        u = 96
+        v = 96 + enemy.id * 32
         
         if enemy.attacked:
-            
-                    
-            enemy.vy = self.ego.vy + (enemy.y - self.ego.y) * 16 - (enemy.y - self.ego.y) * 8
-            enemy.vx = self.ego.vx + (enemy.x - self.ego.x) * 16 - (enemy.x - self.ego.x) * 8
+                                
+            # enemy.vy = self.ego.vy + (enemy.y - self.ego.y) * 16 - (enemy.y - self.ego.y) * 8
+            # enemy.vx = self.ego.vx + (enemy.x - self.ego.x) * 16 - (enemy.x - self.ego.x) * 8
             enemy.attack_motion_timer -= 1
             
+            # 攻撃する方向にキャラの向きを変更する
+            if enemy.y - self.ego.y > 0:
+                enemy.d = Direction.UP
+                enemy.vy -= 8
+            elif enemy.x - self.ego.x < 0:
+                enemy.d = Direction.RIGHT
+                enemy.vx += 8
+            elif enemy.y - self.ego.y < 0:
+                enemy.d = Direction.DOWN
+                enemy.vy += 8
+            elif enemy.x - self.ego.x > 0:
+                enemy.d = Direction.LEFT
+                enemy.vx -= 8
+            
+            # エフェクト
+            self.draw_enemy_effect(enemy)
+                        
             if enemy.attack_motion_timer == 0:
                 enemy.attacked = False
                 enemy.attack_motion_timer = 3 # [frames]
@@ -575,27 +641,27 @@ class App:
         y = enemy.vy   
         if enemy.d == Direction.UP:
             if self.tick %2 == 0:
-                pyxel.blt(x, y, 0, 112, 96, 16, 16, 0)
+                pyxel.blt(x, y, 0, u + 16, v, 16, 16, 0)
             else:
-                pyxel.blt(x, y, 0, 112, 112, 16, 16, 0)
+                pyxel.blt(x, y, 0, u + 16, v + 16, 16, 16, 0)
 
         elif enemy.d == Direction.RIGHT:
             if self.tick %2 == 0:
-                pyxel.blt(x, y, 0, 128, 96, -16, 16, 0)
+                pyxel.blt(x, y, 0, u + 32, v, -16, 16, 0)
             else:
-                pyxel.blt(x, y, 0, 128, 112, -16, 16, 0)
+                pyxel.blt(x, y, 0, u + 32, v + 16, -16, 16, 0)
             
         elif enemy.d == Direction.DOWN:
             if self.tick %2 == 0:
-                pyxel.blt(x, y, 0, 96, 96, 16, 16, 0)
+                pyxel.blt(x, y, 0, u, v, 16, 16, 0)
             else:
-                pyxel.blt(x, y, 0, 96, 112, 16, 16, 0)
+                pyxel.blt(x, y, 0, u, v + 16, 16, 16, 0)
 
         elif enemy.d == Direction.LEFT:
             if self.tick %2 == 0:
-                pyxel.blt(x, y, 0, 128, 96, 16, 16, 0)
+                pyxel.blt(x, y, 0, u + 32, v, 16, 16, 0)
             else:
-                pyxel.blt(x, y, 0, 128, 112, 16, 16, 0)
+                pyxel.blt(x, y, 0, u + 32, v + 16, 16, 16, 0)
 
         
 
@@ -782,14 +848,14 @@ class App:
         cx = self.ego.x
         
         # 最短経路の更新
-        if not pyxel.frame_count % 1:
-                
-            enemy.route = self.map.search_shortest_path_dws((ey, ex), (cy, cx))
-            enemy.route = deque(enemy.route)
-            enemy.route.popleft() # 一つ目はstartなので捨てる
-            # enemy.route.pop() # 最後は自分キャラ
+        if not pyxel.frame_count % 1:            
+            distance = np.sqrt((enemy.x - self.ego.x)**2 + (enemy.y - self.ego.y)**2)
+            if distance <= 20:
+                enemy.route = self.map.search_shortest_path_dws((ey, ex), (cy, cx))
+                enemy.route = deque(enemy.route)
+                enemy.route.popleft() # 一つ目はstartなので捨てる
+                # enemy.route.pop() # 最後は自分キャラ
             
-
         if len(enemy.route) > 0:
             next_cell = enemy.route.popleft()
             x = next_cell[1]
@@ -799,6 +865,11 @@ class App:
             # もし隣接していれば敵の攻撃
             if x == self.ego.x and y == self.ego.y:
                 enemy.attacked = True
+
+            # 遠距離で攻撃できる敵の場合
+            if enemy.id == 1:
+                if distance < 4:
+                    enemy.attacked = True
                 
             # 占有されていなければ動く
             elif self.occupancy[y, x] == False:
@@ -822,14 +893,14 @@ class App:
                 
         else:
             pass
-
+            
+                    
 
     def move_target(self, target):
         """
         入力されたキーと異なる方向をむいていた場合、
         まず向きだけをかえる
         """
-        
         
         mx = target.x
         my = target.y            
