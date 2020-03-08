@@ -108,8 +108,8 @@ class Man:
         self.hitpoints += max_hp_up        
 
     def kill(self):
-        self.x = -255
-        self.x = -255
+        # self.x = -255
+        # self.x = -255
         self.alive = False
 
 class Enemy(Man):
@@ -862,17 +862,18 @@ class App:
             y = next_cell[0]
             
             # 敵味方アイテムと重なることはしない TODO: 現時点では敵同士はかさなる。判定はOCCUPIED_MAPをつくって管理すること
-            # もし隣接していれば敵の攻撃
-            if x == self.ego.x and y == self.ego.y:
-                enemy.attacked = True
 
             # 遠距離で攻撃できる敵の場合
             if enemy.id == 1:
                 if distance < 4:
                     enemy.attacked = True
+
+            # もし隣接していれば敵の攻撃
+            if x == self.ego.x and y == self.ego.y:
+                enemy.attacked = True
                 
             # 占有されていなければ動く
-            elif self.occupancy[y, x] == False:
+            if self.occupancy[y, x] == False and enemy.attacked == False:
                 
                 d = Direction.DOWN
                 dx = x - enemy.x
