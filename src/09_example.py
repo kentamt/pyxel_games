@@ -32,6 +32,10 @@ class Direction(Enum):
     LEFT=7,
     UPLEFT=8
 
+exp_table = {}
+for lv in range(1, 100):
+    exp_table[lv] = int(lv**2*1.5) + 4
+
 def draw_tile(x, y, tile_type):
     txy = get_tile_loc(tile_type)
     pyxel.blt(x, y, 0, txy[0], txy[1], 16, 16)
@@ -56,6 +60,10 @@ class Man:
         self.hunger = 100
         self.step_count = 0
         self.attack_motion_timer = 3  # [frames]
+        
+        self.strength = 5
+        self.defense = 5        
+        
         self.lv = 1
         self.exp = 0
 
@@ -71,13 +79,22 @@ class Man:
             self.step_count += 1
             self.hunger -= 1
 
+    def level_up(self):
+        self.lv += 1
+        self.strength += np.random.randint(1,5)
+        self.defense += np.random.randint(1,5)
+        max_hp_up = np.random.randint(7,15)
+        self.max_hp += max_hp_up
+        self.hitpoints += max_hp_up
+        
+
     def kill(self):
         self.x = -255
         self.x = -255
         self.alive = False
 
 class Enemy(Man):
-    def __init__(self, _x, _y, _c, _d=Direction.UP, hitpoints=10, max_hitpoints=10, exp=1):
+    def __init__(self, _x, _y, _c, _d=Direction.UP, hitpoints=10, max_hitpoints=10, exp=5):
         super().__init__(_x, _y, _c, _d=_d, hitpoints=hitpoints, max_hitpoints=max_hitpoints)
         self.route = None
         self.exp = exp
@@ -291,7 +308,7 @@ class App:
                     for idx, enemy in enumerate(self.enemies):                        
                         if enemy.x == attacked_cell[0] and enemy.y == attacked_cell[1]:
                             # 敵の体力を減らす
-                            enemy.hitpoints -= 8    
+                            enemy.hitpoints -= int(self.ego.strength - enemy.defense/2.0) if self.ego.strength - enemy.defense/2.0 else 1
                             pyxel.play(3, [12]) # 攻撃があたる音
                             
                             # 敵の体力が0以下なら、殺す
@@ -301,8 +318,11 @@ class App:
                                 self.ego.exp += enemy.exp
                                 del self.enemies[idx] # TODO: デストラクでOCCを解放したい
                                 
-                        
-                        
+                                # レベルアップ判定
+                                while self.ego.exp > exp_table[self.ego.lv+1]:
+                                    self.ego.level_up()
+                                    # 音でもならす
+                                                
                 if self.ego.moved and self.ego.attacked:
                     self.turn = Turn.WAIT           
                 elif self.ego.moved:
@@ -318,7 +338,7 @@ class App:
                         
                         if enemy.attacked:
                             pyxel.play(3, [12]) # 攻撃があたる音
-                            self.ego.hitpoints -= 1
+                            self.ego.hitpoints -= int(enemy.strength - self.ego.defense/2.0) if enemy.strength - self.ego.defense/2.0 > 0 else 0
                             # enemy.attacked = False
                                                             
                 self.turn = Turn.EGO
@@ -463,8 +483,12 @@ class App:
             # 体力
             pyxel.text(70, 5, f"HP: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
             
+            # LV
+            pyxel.text(170, 5, f"Lv: {self.ego.lv}",  7) 
+            
             # 経験値
             pyxel.text(120, 5, f"Exp: {self.ego.exp}",  7) 
+            
             
             # 満腹度
             # pyxel.text(90, 5, f"Hunger: {self.ego.hitpoints}/{self.ego.max_hp}",  7) 
