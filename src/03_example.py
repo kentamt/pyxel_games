@@ -44,7 +44,8 @@ class App:
         self.name = "03_example"
         self.state = State.START
         self.header = 32 #[pix]
-        pyxel.init(96, 96, caption=self.name, scale=7, fps=15)
+        pyxel.init(96, 96, caption=self.name, scale=4, fps=15, 
+                   palette=[0x000000, 0x1D2B53, 0x7E2553, 0x008751, 0xAB5236, 0x5F574F, 0xC2C3C7, 0xFFF1E8, 0xFF004D, 0xFFA300, 0xFFEC27, 0x00E436, 0x29ADFF, 0x83769C, 0xFF77A8, 0xFFCCAA])
     
 
         # 
@@ -56,9 +57,9 @@ class App:
         
         # 地図の初期化
         self.map = City(pyxel.width, pyxel.height-self.header)
-        self.num_col_rooms = 2
-        self.num_row_rooms = 2
-        self.corrider_width = 2
+        self.num_col_rooms = 3
+        self.num_row_rooms = 3
+        self.corrider_width = 1
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
                                     num_row_rooms=self.num_row_rooms,
                                     corrider_width=self.corrider_width,
@@ -80,10 +81,16 @@ class App:
         
 
         for car in self.cars:        
+            print(self.map.dumpings.items())
             if car.loaded:
+                # print(self.map.dumpings.items())
                 car.dest = random.choice(list(self.map.dumpings.items())) # (idx, (y, x)) # キャラの目的地
+                # print("dest:===>")
+                # print(car.dest)
             else:
                 car.dest = random.choice(list(self.map.loadings.items())) # (idx, (y, x)) # キャラの目的地
+                # print("dest:===>")
+                # print(car.dest)
 
         # 実行        
         pyxel.run(self.update, self.draw)
@@ -118,7 +125,7 @@ class App:
 
                         #  現在の状態に合わせて目的地を変更
                         if car.loaded:
-                            car.dest = random.choice(list(self.map.dumpings.items())) # (idx, (y, x)) # キャラの目的地
+                            car.dest = random.choice(list(self.map.dumpings.items())) # (idx, (y, x)) # キャラの目的地                            
                         else:   
                             car.dest = random.choice(list(self.map.loadings.items())) # (idx, (y, x)) # キャラの目的地
 
@@ -135,12 +142,14 @@ class App:
         """
         if self.state == State.START:
             pyxel.cls(0)
+            pyxel.text(0, 0, self.name, 7)
             pyxel.text(5, int(pyxel.height/2.0), "PLAY GAME",  7)            
             
         elif self.state == State.MAIN:
             pyxel.cls(0)
-            pyxel.text(0, 0, f"SCORE: {self.total_score:08d} TON",  7)            
-            pyxel.text(0, 7, f"TIME: {int(pyxel.frame_count/15.)}",  7)            
+            pyxel.text(0, 0, self.name, 7)
+            pyxel.text(0, 7, f"SCORE: {self.total_score:08d} TON",  7)            
+            pyxel.text(0, 14, f"TIME: {int(pyxel.frame_count/15.)}",  7)            
             
 
             # 迷路
@@ -155,6 +164,7 @@ class App:
 
         elif self.state == State.END:
             pyxel.cls(0)
+            pyxel.text(0, 0, self.name, 7)
             pyxel.text(5, int(pyxel.height/2.0), "GAME OVER",  7 )            
 
     # ----------------------------------------------------------------------

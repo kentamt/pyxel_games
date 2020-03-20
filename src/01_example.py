@@ -57,11 +57,11 @@ class App:
     def draw(self):
         if self.state == State.START:
             pyxel.cls(0)
-            pyxel.text(10, 10, "01_example.py", pyxel.frame_count % 16)
-            pyxel.blt(30, 40, 0, 0, 0, 38, 16)
+            pyxel.text(0, 0, "01_example.py", 7)
             
         elif self.state == State.MAIN:
             pyxel.cls(0)
+            pyxel.text(0, 0, "01_example.py", 7)
             for v in self.vehicles:
                 pyxel.rect(v.x, v.y, 2, 2, v.c)
 App()

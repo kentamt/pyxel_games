@@ -1,6 +1,6 @@
 import copy
 import random
-from enum import Enum
+from enum import Enum, auto
 from collections import deque
 
 import numpy as np
@@ -121,7 +121,24 @@ class Enemy(Man):
         
     def set_route(self, _route):
         self.route = _route
+
+class Object(object):
+    def __init__(self, _x, _y):
+        self.x = _x
+        self.y = _y
+
+class FoodType(Enum):
+    SUPTER_NIKU = auto()
+    NIKU = auto()
+    YASAI = auto()
+    KOME = auto()
+        
+
+class Food(Object):
+    def __init__(self, _x, _y):
+        super().__init__(_x, _y)
     
+
 
 class App:
     def __init__(self):
@@ -134,7 +151,7 @@ class App:
         self.turn = Turn.EGO
 
         # ゲームの設定
-        pyxel.init(256, 256, caption=self.name, scale=2, fps=15)# , palette=palette)
+        pyxel.init(256, 256, caption=self.name, scale=2, fps=12)# , palette=palette)
         pyxel.load("my_resource.pyxres")
         pyxel.playm(0, loop=True)        
         

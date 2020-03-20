@@ -37,17 +37,16 @@ class App:
 
         scale = int(256/16)
 
-        self.map = City(64, 64) # int(pyxel.width), int(pyxel.height/8))
-        self.num_col_rooms = 2
-        self.num_row_rooms = 2
-        self.corrider_width = 1
-        self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, 
-                                    num_row_rooms=self.num_row_rooms,
-                                    corrider_width=self.corrider_width,
-                                    max_room_size_ratio=0.7,
-                                    min_room_size_ratio=0.2
-                                    )
+        self.map = City(16, 16) # int(pyxel.width), int(pyxel.height/8))
+        self.map.data = np.ones((self.map.h, self.map.w), dtype=np.int)
+        self.map.data[2:-2, 2:-2] = 0
+        self.map.data[6:-6, 6:-6] = 1
+        self.map.data[:, 4] = 0
+        self.map.data[5, :] = 0
         
+        
+
+
         self.real_size_map = copy.deepcopy(self.map.data )
         
         # 自キャラの初期化
@@ -107,181 +106,177 @@ class App:
             WALL_CORRIDER_DOWN = 22,
             
 
-        # tile_info_map = np.zeros((self.map.h, self.map.w), dtype=np.int)
-        # # y方向に微分して境目を見つける
-        # for iy in range(self.map.h-1):
-        #     line = self.map.data[iy+1, :] - self.map.data[iy, :]
-        #     # 壁から通路なら-1, 通路から壁なら1
-        #     for ix, e in enumerate(line):
-        #         if e == -1:                    
-        #             tile_info_map[iy, ix] = 1
-        #         if e == 1:                    
-        #             tile_info_map[iy+1, ix] = 2
+        tile_info_map = np.zeros((self.map.h, self.map.w), dtype=np.int)
 
-        # # x方向に微分して境目を見つける
-        # for ix in range(self.map.w-1):
-        #     line = self.map.data[:, ix+1] - self.map.data[:, ix]
-        #     # 壁から通路なら-1, 通路から壁なら1
-        #     for iy, e in enumerate(line):
-        #         if e == -1:                    
-        #             tile_info_map[iy, ix] = 3
-        #         if e == 1:                    
-        #             tile_info_map[iy, ix+1] = 4
-        # # 0, 1     5, 1
-        # # 3, 0 ==> 3, 0
-        # srcs = [
-        #     np.array([[0,1],[3, 0]]),
-        #     np.array([[3,0],[0, 2]]),
-        #     np.array([[1,0],[0, 4]]),
-        #     np.array([[0,4],[2, 0]]),
-        #     np.array([[4,2],[4, 0]]),            
-        #     np.array([[4,0],[4, 1]]),            
-        #     np.array([[2,3],[0, 3]]),
-        #     np.array([[0,3],[1, 3]]),
-                        
-            
-            
-        # ]
-        
-        # dsts = [
-        #     np.array([[5,1],[3, 0]]),
-        #     np.array([[3,0],[6, 2]]),
-        #     np.array([[1,7],[0, 4]]),
-        #     np.array([[0,4],[2, 8]]),
-        #     np.array([[13,2],[4, 0]]),
-        #     np.array([[4,0],[14, 1]]),            
-        #     np.array([[2,15],[0, 3]]),
-        #     np.array([[0,3],[1, 16]]),                        
-        # ]
+        # y方向に微分して境目を見つける
+        for iy in range(self.map.h-1):
+            line = self.map.data[iy+1, :] - self.map.data[iy, :]
+            # 壁から通路なら-1, 通路から壁なら1
+            for ix, e in enumerate(line):
+                if e == -1:                    
+                    tile_info_map[iy, ix] = 1
+                if e == 1:                    
+                    tile_info_map[iy+1, ix] = 2
 
-        # import copy 
-        # for src, dst in zip(srcs, dsts):
-        #     tile_info_map_copy = copy.deepcopy(tile_info_map)
-        #     for iy in range(self.map.h-1):
-        #         for ix in range(self.map.w-1):
-        #             diff = tile_info_map[iy:iy+2, ix:ix+2] - src                
-        #             if np.all(diff == 0):
-        #                 tile_info_map_copy[iy:iy+2, ix:ix+2] = dst
-        #     tile_info_map = copy.deepcopy(tile_info_map_copy)
+        # x方向に微分して境目を見つける
+        for ix in range(self.map.w-1):
+            line = self.map.data[:, ix+1] - self.map.data[:, ix]
+            # 壁から通路なら-1, 通路から壁なら1
+            for iy, e in enumerate(line):
+                if e == -1:                    
+                    tile_info_map[iy, ix] = 3
+                if e == 1:                    
+                    tile_info_map[iy, ix+1] = 4
+        # 0, 1     5, 1
+        # 3, 0 ==> 3, 0
+        srcs = [
+            np.array([[0,1],[3, 0]]),
+            np.array([[3,0],[0, 2]]),
+            np.array([[1,0],[0, 4]]),
+            np.array([[0,4],[2, 0]]),
+            np.array([[4,2],[4, 0]]),            
+            np.array([[4,0],[4, 1]]),            
+            np.array([[2,3],[0, 3]]),
+            np.array([[0,3],[1, 3]]),
+
+        ]
         
-        # src = np.array([1,0,1,0,2])
-        # dst = np.array([1,0,17,0,2])
+        dsts = [
+            np.array([[5,1],[3, 0]]),
+            np.array([[3,0],[6, 2]]),
+            np.array([[1,7],[0, 4]]),
+            np.array([[0,4],[2, 8]]),
+            np.array([[13,2],[4, 0]]),
+            np.array([[4,0],[14, 1]]),            
+            np.array([[2,15],[0, 3]]),
+            np.array([[0,3],[1, 16]]),                        
+        ]
+
+        import copy 
+        for src, dst in zip(srcs, dsts):
+            tile_info_map_copy = copy.deepcopy(tile_info_map)
+            for iy in range(self.map.h-1):
+                for ix in range(self.map.w-1):
+                    diff = tile_info_map[iy:iy+2, ix:ix+2] - src                
+                    if np.all(diff == 0):
+                        tile_info_map_copy[iy:iy+2, ix:ix+2] = dst
+            tile_info_map = copy.deepcopy(tile_info_map_copy)
         
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h-4):
-        #     for ix in range(self.map.w):
-        #         diff = tile_info_map[iy:iy+5, ix] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy:iy+5, ix] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
+        src = np.array([1,0,1,0,2])
+        dst = np.array([1,0,17,0,2])
+        
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h-4):
+            for ix in range(self.map.w):
+                diff = tile_info_map[iy:iy+5, ix] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy:iy+5, ix] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
+∑    
+        src = np.array([3,0,3,0,4])
+        dst = np.array([3,0,18,0,4])
+        
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h):
+            for ix in range(self.map.w-4):
+                diff = tile_info_map[iy, ix:ix+5] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy, ix:ix+5] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
     
-        # src = np.array([3,0,3,0,4])
-        # dst = np.array([3,0,18,0,4])
-        
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h):
-        #     for ix in range(self.map.w-4):
-        #         diff = tile_info_map[iy, ix:ix+5] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy, ix:ix+5] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
-    
-        # src = np.array([4, 17])
-        # dst = np.array([19, 17])
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h):
-        #     for ix in range(self.map.w-1):
-        #         diff = tile_info_map[iy, ix:ix+2] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy, ix:ix+2] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
+        src = np.array([4, 17])
+        dst = np.array([19, 17])
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h):
+            for ix in range(self.map.w-1):
+                diff = tile_info_map[iy, ix:ix+2] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy, ix:ix+2] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
         
 
-        # src = np.array([17, 3])
-        # dst = np.array([17, 20])
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h):
-        #     for ix in range(self.map.w-1):
-        #         diff = tile_info_map[iy, ix:ix+2] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy, ix:ix+2] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
+        src = np.array([17, 3])
+        dst = np.array([17, 20])
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h):
+            for ix in range(self.map.w-1):
+                diff = tile_info_map[iy, ix:ix+2] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy, ix:ix+2] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
         
 
-        # src = np.array([18, 3])
-        # dst = np.array([18, 22])
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h-1):
-        #     for ix in range(self.map.w):
-        #         diff = tile_info_map[iy:iy+2, ix] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy:iy+2, ix] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
+        src = np.array([18, 3])
+        dst = np.array([18, 22])
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h-1):
+            for ix in range(self.map.w):
+                diff = tile_info_map[iy:iy+2, ix] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy:iy+2, ix] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
         
-        # src = np.array([3, 18])
-        # dst = np.array([21, 18])
-        # tile_info_map_copy = copy.deepcopy(tile_info_map)
-        # for iy in range(self.map.h-1):
-        #     for ix in range(self.map.w):
-        #         diff = tile_info_map[iy:iy+2, ix] - src                
-        #         if np.all(diff == 0):
-        #             tile_info_map_copy[iy:iy+2, ix] = dst
-        # tile_info_map = copy.deepcopy(tile_info_map_copy)
+        src = np.array([3, 18])
+        dst = np.array([21, 18])
+        tile_info_map_copy = copy.deepcopy(tile_info_map)
+        for iy in range(self.map.h-1):
+            for ix in range(self.map.w):
+                diff = tile_info_map[iy:iy+2, ix] - src                
+                if np.all(diff == 0):
+                    tile_info_map_copy[iy:iy+2, ix] = dst
+        tile_info_map = copy.deepcopy(tile_info_map_copy)
         
     
-
-        
-        
-        # def get_tile_loc(tile_type):
-        #     if tile_type == TyleType.WALL_IN_UP:
-        #         ret = (16, 32)
-        #     elif tile_type == TyleType.WALL_IN_DOWN:
-        #         ret = (16, 64)
-        #     elif tile_type == TyleType.WALL_IN_LEFT:
-        #         ret = (0, 48)
-        #     elif tile_type == TyleType.WALL_IN_RIGHT:
-        #         ret = (32, 48)
-        #     elif tile_type == TyleType.WALL_IN_UL_CORNER:
-        #         ret = (0, 32)
-        #     elif tile_type == TyleType.WALL_IN_DL_CORNER:
-        #         ret = (0, 64)
-        #     elif tile_type == TyleType.WALL_IN_UR_CORNER:
-        #         ret = (32, 32)
-        #     elif tile_type == TyleType.WALL_IN_DR_CORNER:
-        #         ret = (32, 64)
-        #     elif tile_type == TyleType.WALL_OUT_UP:
-        #         ret = (16, 80)
-        #     elif tile_type == TyleType.WALL_OUT_DOWN:
-        #         ret = (16, 112)
-        #     elif tile_type == TyleType.WALL_OUT_LEFT:
-        #         ret = (8, 96)
-        #     elif tile_type == TyleType.WALL_OUT_RIGHT:
-        #         ret = (24, 96)
-        #     elif tile_type == TyleType.WALL_OUT_UL_CORNER:
-        #         ret = (8, 80)
-        #     elif tile_type == TyleType.WALL_OUT_DL_CORNER:
-        #         ret = (8, 112)
-        #     elif tile_type == TyleType.WALL_OUT_UR_CORNER:
-        #         ret = (24, 80)
-        #     elif tile_type == TyleType.WALL_OUT_DR_CORNER:
-        #         ret = (24, 112)
-        #     elif tile_type == TyleType.WALL_CORRIDER_H_CENTER:
-        #         ret = (56, 32)
-        #     elif tile_type == TyleType.WALL_CORRIDER_V_CENTER:
-        #         ret = (40, 96)
-        #     elif tile_type == TyleType.WALL_CORRIDER_LEFT:
-        #         ret = (56, 48)
-        #     elif tile_type == TyleType.WALL_CORRIDER_RIGHT:
-        #         ret = (72, 32)
-        #     elif tile_type == TyleType.WALL_CORRIDER_UP:
-        #         ret = (40, 80)
-        #     elif tile_type == TyleType.WALL_CORRIDER_DOWN:
-        #         ret = (40, 112)
-        #         pass
-        #     else:
-        #         ret = None    
+        def get_tile_loc(tile_type):
+            if tile_type == TyleType.WALL_IN_UP:
+                ret = (16, 32)
+            elif tile_type == TyleType.WALL_IN_DOWN:
+                ret = (16, 64)
+            elif tile_type == TyleType.WALL_IN_LEFT:
+                ret = (0, 48)
+            elif tile_type == TyleType.WALL_IN_RIGHT:
+                ret = (32, 48)
+            elif tile_type == TyleType.WALL_IN_UL_CORNER:
+                ret = (0, 32)
+            elif tile_type == TyleType.WALL_IN_DL_CORNER:
+                ret = (0, 64)
+            elif tile_type == TyleType.WALL_IN_UR_CORNER:
+                ret = (32, 32)
+            elif tile_type == TyleType.WALL_IN_DR_CORNER:
+                ret = (32, 64)
+            elif tile_type == TyleType.WALL_OUT_UP:
+                ret = (16, 80)
+            elif tile_type == TyleType.WALL_OUT_DOWN:
+                ret = (16, 112)
+            elif tile_type == TyleType.WALL_OUT_LEFT:
+                ret = (8, 96)
+            elif tile_type == TyleType.WALL_OUT_RIGHT:
+                ret = (24, 96)
+            elif tile_type == TyleType.WALL_OUT_UL_CORNER:
+                ret = (8, 80)
+            elif tile_type == TyleType.WALL_OUT_DL_CORNER:
+                ret = (8, 112)
+            elif tile_type == TyleType.WALL_OUT_UR_CORNER:
+                ret = (24, 80)
+            elif tile_type == TyleType.WALL_OUT_DR_CORNER:
+                ret = (24, 112)
+            elif tile_type == TyleType.WALL_CORRIDER_H_CENTER:
+                ret = (56, 32)
+            elif tile_type == TyleType.WALL_CORRIDER_V_CENTER:
+                ret = (40, 96)
+            elif tile_type == TyleType.WALL_CORRIDER_LEFT:
+                ret = (56, 48)
+            elif tile_type == TyleType.WALL_CORRIDER_RIGHT:
+                ret = (72, 32)
+            elif tile_type == TyleType.WALL_CORRIDER_UP:
+                ret = (40, 80)
+            elif tile_type == TyleType.WALL_CORRIDER_DOWN:
+                ret = (40, 112)
+                pass
+            else:
+                ret = None    
                 
-        #     return ret
+            return ret
 
         def draw_tile(x, y, tile_type):
             txy = get_tile_loc(tile_type)
@@ -293,92 +288,92 @@ class App:
         cx = self.ego.x
         cy = self.ego.y
         
-        # for ix in range(pyxel.width)[::16]:
-        #     for iy in range(pyxel.height)[::16]:                    
+        for ix in range(pyxel.width)[::16]:
+            for iy in range(pyxel.height)[::16]:                    
                
-        #         tix = int(ix/16 + cx)
-        #         tiy = int(iy/16 + cy)
-        #         if 0 > tix:
-        #             tix = 0
-        #         elif tix > self.map.w:
-        #             tix = self.map.w
+                tix = int(ix/16 + cx)
+                tiy = int(iy/16 + cy)
+                if 0 > tix:
+                    tix = 0
+                elif tix >= self.map.w:
+                    tix = self.map.w-1
 
-        #         if 0 > tiy:
-        #             tiy = 0
-        #         elif tiy > self.map.h:
-        #             tiy = self.map.h
+                if 0 > tiy:
+                    tiy = 0
+                elif tiy >= self.map.h:
+                    tiy = self.map.h-1
                 
-        #         print(tiy, tix)
+                print(tiy, tix)
                 
-        #         tile_type = tile_info_map[tiy, tix]
-        #         if tile_type == 1:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_UP)
+                tile_type = tile_info_map[tiy, tix]
+                if tile_type == 1:
+                    draw_tile(ix, iy, TyleType.WALL_IN_UP)
 
-        #         elif tile_type == 2:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_DOWN)
+                elif tile_type == 2:
+                    draw_tile(ix, iy, TyleType.WALL_IN_DOWN)
 
-        #         elif tile_type == 3:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_LEFT)
+                elif tile_type == 3:
+                    draw_tile(ix, iy, TyleType.WALL_IN_LEFT)
 
-        #         elif tile_type == 4:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_RIGHT)
+                elif tile_type == 4:
+                    draw_tile(ix, iy, TyleType.WALL_IN_RIGHT)
                 
-        #         elif tile_type == 5:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_UL_CORNER)
+                elif tile_type == 5:
+                    draw_tile(ix, iy, TyleType.WALL_IN_UL_CORNER)
 
-        #         elif tile_type == 6:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_DL_CORNER)
+                elif tile_type == 6:
+                    draw_tile(ix, iy, TyleType.WALL_IN_DL_CORNER)
 
-        #         elif tile_type == 7:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_UR_CORNER)
+                elif tile_type == 7:
+                    draw_tile(ix, iy, TyleType.WALL_IN_UR_CORNER)
 
-        #         elif tile_type == 8:
-        #             draw_tile(ix, iy, TyleType.WALL_IN_DR_CORNER)
-        #         # -----
-        #         elif tile_type == 9:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_UP)
+                elif tile_type == 8:
+                    draw_tile(ix, iy, TyleType.WALL_IN_DR_CORNER)
+                # -----
+                elif tile_type == 9:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_UP)
 
-        #         elif tile_type == 10:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_DOWN)
+                elif tile_type == 10:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_DOWN)
 
-        #         elif tile_type == 11:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_LEFT)
+                elif tile_type == 11:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_LEFT)
 
-        #         elif tile_type == 12:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_RIGHT)
+                elif tile_type == 12:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_RIGHT)
 
-        #         elif tile_type == 13:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_UL_CORNER)
+                elif tile_type == 13:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_UL_CORNER)
 
-        #         elif tile_type == 14:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_DL_CORNER)
+                elif tile_type == 14:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_DL_CORNER)
 
-        #         elif tile_type == 15:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_UR_CORNER)
+                elif tile_type == 15:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_UR_CORNER)
 
-        #         elif tile_type == 16:
-        #             draw_tile(ix, iy, TyleType.WALL_OUT_DR_CORNER)
+                elif tile_type == 16:
+                    draw_tile(ix, iy, TyleType.WALL_OUT_DR_CORNER)
                     
-        #         elif tile_type == 17:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_H_CENTER)
+                elif tile_type == 17:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_H_CENTER)
 
-        #         elif tile_type == 18:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_V_CENTER)
+                elif tile_type == 18:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_V_CENTER)
 
-        #         elif tile_type == 19:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_LEFT)
+                elif tile_type == 19:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_LEFT)
                     
-        #         elif tile_type == 20:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_RIGHT)
+                elif tile_type == 20:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_RIGHT)
                     
-        #         elif tile_type == 21:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_UP)
-        #         elif tile_type == 22:
-        #             draw_tile(ix, iy, TyleType.WALL_CORRIDER_DOWN)
+                elif tile_type == 21:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_UP)
+                elif tile_type == 22:
+                    draw_tile(ix, iy, TyleType.WALL_CORRIDER_DOWN)
                     
 
-        #         else:
-        #             pass
+                else:
+                    pass
 
 
         # スモールマップの描画

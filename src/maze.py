@@ -1,13 +1,37 @@
+import copy
 from enum import Enum
 import random
+from collections import deque
+
 import numpy as np
-from scipy.signal import convolve2d
 from scipy.ndimage.filters import minimum_filter, maximum_filter
 
-def dilation(arr, ksize=3):                
 
+# import matplotlib.pyplot as plt
+# import matplotlib.cm as cm
+# import matplotlib.colors as colors
+
+# cmap = cm.jet
+# cmap_data = cmap(np.arange(cmap.N))
+# cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
+# customized_jet = colors.ListedColormap(cmap_data)
+
+# cmap = cm.cool
+# cmap_data = cmap(np.arange(cmap.N))
+# cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
+# customized_cool = colors.ListedColormap(cmap_data)
+
+# cmap = cm.gist_yarg
+# cmap_data = cmap(np.arange(cmap.N))
+# cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
+# customized_gist_yarg = colors.ListedColormap(cmap_data)
+
+
+def dilation(arr, ksize=3):                
+    """ 領域を拡張 """
     ret_arr = np.copy(arr)
     dilation_kernel = np.ones((ksize, ksize))
+    
     if ksize % 2 == 0: 
         l = int(ksize / 2.0)
         r = int(ksize / 2.0)
@@ -21,32 +45,80 @@ def dilation(arr, ksize=3):
                 ret_arr[iy-l:iy+r, ix-l:ix+r] = 0                            
     return ret_arr
 
-class City:
+def max_pooling(img, direction=4):
+
+    h = img.shape[0]
+    w = img.shape[1]
+
+    if direction == 4:
+        g = np.array([[0, 1, 0],
+                      [1, 1, 1],
+                      [0, 1, 0]])
+    elif direction == 8:
+        g = np.array([[1, 1, 1],
+                      [1, 1, 1],
+                      [1, 1, 1]])        
+    else:
+        raise ValueError("Invalid number of directions")
+        
+    src = np.zeros((h+2, w+2), dtype=img.dtype) # 0 padding 
+    src[1:-1, 1:-1]  = copy.deepcopy(img)
+    dst = copy.deepcopy(src)
+    
+    for iy in range(1, h+1):
+        for ix in range(1, w+1):
+            dst[iy, ix] = np.max(src[iy-1:iy+2, ix-1:ix+2][g==1])
+        
+    return dst[1:-1, 1:-1]
+
+def min_pooling(img, direction=4):
+
+    h = img.shape[0]
+    w = img.shape[1]
+
+    if direction == 4:
+        g = np.array([[0, 1, 0],
+                      [1, 1, 1],
+                      [0, 1, 0]])
+    elif direction == 8:
+        g = np.array([[1, 1, 1],
+                      [1, 1, 1],
+                      [1, 1, 1]])        
+    else:
+        raise ValueError("Invalid number of directions")
+        
+    src = np.zeros((h+2, w+2), dtype=img.dtype) # 0 padding 
+    src[1:-1, 1:-1]  = copy.deepcopy(img)
+    dst = copy.deepcopy(src)
+    
+    for iy in range(1, h+1):
+        for ix in range(1, w+1):
+            dst[iy, ix] = np.min(src[iy-1:iy+2, ix-1:ix+2][g==1])
+        
+    return dst[1:-1, 1:-1]
+
+class Maze:
     def __init__(self, w, h, debug=False):
         super().__init__()
         """
         self.dataが地図
         0: 走行可能
         1: 走行不可
-        [2,...]:目的地番号, 偶数は排土場、奇数は積み込み場
+        [2,...]:部屋番号
         -1: ゴール
         -2: スタート
 
-        目的地番号にしたがって車はそこを目指し続ける        
-        
         """
         self.w = w
         self.h = h
-        self.data = np.zeros((h, w), np.int)
+        self.data = np.zeros((h, w), np.int) 
+        self.room = np.zeros((h, w), dtype=bool)
+        self.corrider = np.zeros((h, w), dtype=bool)
         self.occupancuy = np.zeros((h, w), dtype=bool) # True = キャラがいる
+        self.entrances = []
             
         self.location_idxs = list(range(2, 100))
         self.locations = {}
-        self.dumpings = {} # 排土場所
-        self.loadings = {} # 積み込み場所
-        # {
-        #      2: (x, y)
-        # }
     
         self.goal_x = None
         self.goal_y = None
@@ -76,6 +148,69 @@ class City:
                 elif num==3:
                     self.data[j+1, i] = 1
                     
+    def create_map_digging(self):
+        
+        # 周囲を1つ大きくして通路、それ以外を壁とする
+        self.data = np.zeros((self.h, self.w), dtype=np.int) # 通路        
+        self.data[1:-1, 1:-1] = 1
+
+        # 壁の中からx、yともに奇数の開始点を選ぶ
+        idx = list(zip(*np.where(self.data==1)))
+        xy = random.sample(idx, 1)[0]
+        while True:
+            xy = random.sample(idx, 1)[0]
+            if xy[0]%2==1 and xy[1]%2==1:
+                if 2 < xy[0] < self.data.shape[0]-2 and 2 < xy[1] < self.data.shape[1]-2:
+                    break
+
+        # 掘ったセルの記憶, だたしx, yともに奇数のもののみ格納
+        digged = deque()
+        digged.append(xy)
+            
+        # 開始点を通路にする
+        self.data[xy[0], xy[1]] = 0
+                
+        # 掘り進める
+        # l, d, r, u
+        d = [(0,-1), (1,0), (0,1), (-1,0)]
+        idx = [0, 1, 2, 3]
+        while len(digged):
+            rand_idx = random.sample(idx, 4)
+            dig_OK = False
+            for ridx in rand_idx:
+                
+                ny = xy[0] + d[ridx][0]
+                nx = xy[1] + d[ridx][1]
+                nny = xy[0] + 2*d[ridx][0]
+                nnx = xy[1] + 2*d[ridx][1]
+                                    
+                # 掘っていいか判定する
+                # 次が壁、次の次が道なら掘れない
+                if self.data[ny, nx] == 1 and self.data[nny, nnx] == 1:
+                    # 掘れそうなので掘る
+                    self.data[ny, nx] = 0
+                    self.data[nny, nnx] = 0
+
+                    # 掘ったリストに記憶
+                    digged.append((nny, nnx))
+                    
+                    # 次は掘った場所からスタート
+                    xy = (nny, nnx)
+                    dig_OK = True
+                    break
+                else:
+                    # 掘れそににない
+                    pass
+
+            if not dig_OK:
+                # 掘れなかったので、開始点を過去に掘った場所から探す
+                xy = digged.popleft()
+            
+        self.data[0, :] = 1
+        self.data[:, 0] = 1
+        self.data[-1, :] = 1
+        self.data[:, -1] = 1
+                    
     def create_map_dungeon(self, num_col_rooms=3, 
                            num_row_rooms=2, 
                            corrider_width=1, 
@@ -88,7 +223,7 @@ class City:
         self.data = np.ones(self.data.shape, np.int)
         
         # 適当に配列を分割する
-        # NOTE: 各値は偶数でないと道がつながらない。
+        # NOTE: 各値は偶数でないと道がつながらないので&~1で偶数化
         rand_col_idx = [ int(e)&~1 for e in np.linspace(0, self.w-1, num=int(num_col_rooms)+1)]
         rand_row_idx = [ int(e)&~1 for e in np.linspace(0, self.h-1, num=int(num_row_rooms)+1)]
 
@@ -127,6 +262,7 @@ class City:
     
         # 各部屋を塗りつぶす + 通路をつくる
         corriders = np.ones(self.data.shape, np.int)
+        self.entrances = []
         for iy in range(num_row_rooms):
             for ix in range(num_col_rooms):            
                 w = room_size_x[iy, ix]
@@ -136,6 +272,7 @@ class City:
                 rmsx = room_max_size_x[iy,ix]
                 rmsy = room_max_size_y[iy,ix]
                 self.data[cy-int(h/2.0):cy+int(h/2.0), cx-int(w/2.0):cx+int(w/2.0)] = 0
+                self.room[cy-int(h/2.0):cy+int(h/2.0), cx-int(w/2.0):cx+int(w/2.0)] = True
         
                 # 各部かから通路への垂線を上下左右４本分生成
                 exit_x_up = np.random.randint(cx-int(w/2.0)+1, cx+int(w/2.0)-1)
@@ -144,68 +281,103 @@ class City:
                 exit_right = np.random.randint(cy-int(h/2.0)+1, cy+int(h/2.0)-1)
                 
                 # cxからcx+rmsx/2.0, cx-rmsx/2.0だけ線を引く
-                # ただし, 端に触れていへ部屋は通路をつくらない
-                
+                # ただし, 端に触れている部屋は通路をつくらない                
                 rx = int(rmsx/2.0)
                 ry = int(rmsy/2.0)
+                rsx = int(room_size_x[iy, ix]/2.0)
+                rsy = int(room_size_y[iy, ix]/2.0)
                 
                 # 列が1つの場合
                 if num_row_rooms == 1 and ix == 0:
                     corriders[exit_right, cx:cx+rx] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    
                 elif num_row_rooms == 1 and ix == num_col_rooms-1:
                     corriders[exit_left, cx-rx:cx] = 0
+                    self.entrances.append((exit_left+1, cx-rsx-1))
+                    
                 # 行が1つの場合
                 elif num_col_rooms == 1 and iy == 0:
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((cy+rsy, exit_x_down+1))
+                    
                 elif num_col_rooms == 1 and iy == num_row_rooms-1:
                     corriders[cy-ry:cy, exit_x_up] = 0
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
 
                 elif iy == 0 and ix == 0:
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((cy+rsy, exit_x_down+1))
                 # 
                 elif iy == num_row_rooms-1 and ix == num_col_rooms-1:
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
+                    self.entrances.append((exit_left+1, cx-rsx-1))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
                 # 
                 elif iy == 0 and ix == num_col_rooms-1:
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((exit_left+1, cx-rsx-1))
+                    self.entrances.append((cy+rsy, exit_x_down+1))
                 # 
                 elif iy == num_row_rooms-1 and ix == 0:
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
                 # 
                 elif iy == num_row_rooms-1 and ix == 0:
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
 
                 elif iy == 0:
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((exit_left+1, cx-rsx-1))
+                    self.entrances.append((cy+rsy, exit_x_down+1))
+                #   
 
                 elif iy == num_row_rooms-1:
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((exit_left+1, cx-rsx-1))                    
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
 
                 elif ix == 0:
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((cy+rsy, exit_x_down+1))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
 
                 elif ix == num_col_rooms-1:
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
+                    self.entrances.append((exit_left+1, cx-rsx-1))                    
+                    self.entrances.append((cy+rsy, exit_x_down+1))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
                             
                 else:                
                     corriders[exit_left, cx-rx:cx] = 0
                     corriders[exit_right, cx:cx+rx] = 0
                     corriders[cy-ry:cy, exit_x_up] = 0
                     corriders[cy:cy+ry, exit_x_down] = 0
-
+                    self.entrances.append((exit_right-1, cx+rsx))
+                    self.entrances.append((exit_left+1, cx-rsx-1))                    
+                    self.entrances.append((cy+rsy, exit_x_down+1))
+                    self.entrances.append((cy-rsy-1, exit_x_up-1))
+                    
         # 線をつなげる
         rand_col_idx = np.array(rand_col_idx)
         for col_idx in rand_col_idx[1:-1]:
@@ -224,12 +396,12 @@ class City:
                 corriders[row_idx, end_x[0]:end_x[1]+1] = 0                
 
         if corrider_width > 1:            
-            dilated_corriders = dilation(corriders, ksize=corrider_width)
+            dilated_corriders = dilation(corriders, ksize=corrider_width)            
             corriders = np.logical_xor(dilated_corriders.astype(np.bool), ~(corriders).astype(np.bool))
-
+            # TODO: corridersに特別な値いいれる
+                        
         self.data = np.logical_and(self.data, corriders)
         self.data = self.data.astype(np.int)
-
 
         # 各部屋に場所番号を与える
         idx = 0
@@ -238,34 +410,49 @@ class City:
 
                 cx = room_center_x[iy, ix]
                 cy = room_center_y[iy, ix]                
-                
-                self.data[cy, cx] = self.location_idxs[idx % len(self.location_idxs)]
-                # print(cx, cy, self.data[cy, cx])
-                self.locations[self.data[cy, cx]] = (cy, cx)
+
+                self.locations[idx] = (cy, cx)
                 idx += 1
-            
-        # 積み込み場と排土場に分ける TODO:偶奇でわけているだけ
-        self.dumpings = {e[0]:e[1] for e in self.locations.items() if e[0] % 2 == 0}
-        self.loadings = {e[0]:e[1] for e in self.locations.items() if e[0] % 2 != 0}
-        print(self.locations)
-        print(self.dumpings)
-        print(self.loadings)
+
+
     def get_free_space(self, num=1):
         
         idx = list(zip(*np.where(self.data==0)))
-        xy = random.sample(idx, num)
-        # x = random.sample(range(self.w), num, replace=False)
-        # y = random.choice(range(self.h), num, replace=False)
-        # x = np.random.randint(self.w)
-        # y = np.random.randint(self.h)        
-        # while self.data[y, x] != 0:
-        #     x = random.choice(range(self.w), num, replace=False)
-        #     y = random.choice(range(self.h), num, replace=False)
-
-        #     x = np.random.randint(self.w)
-        #     y = np.random.randint(self.h)        
+        yx = random.sample(idx, num)
+        
+        if num==1:
+            yx = yx[0]
     
-        return xy
+        return yx
+
+    def get_local_data(self, mcy, mcx):
+        """
+        cx, cyを中心とするマップ
+        """
+        
+        #mcx = int(cx/16)
+        # mcy = int(cy/16)        
+        rmdx = 8
+        lmdx = 8
+        umdy = 8
+        dmdy = 8
+        mdx2 = 16
+        mdy2 = 16
+        
+        if mcx - lmdx < 0:            
+            lmdx = mcx - 0
+            rmdx = mdx2 - lmdx
+        elif mcx + rmdx > self.w:
+            rmdx = self.w - mcx
+            lmdx = mdx2 - rmdx
+        if mcy - umdy < 0:
+            umdy = mcy - 0
+            dmdy = mdy2 - umdy
+        if mcy + dmdy > self.h:
+            dmdy = self.h - mcy
+            umdy = mdy2 - dmdy
+            
+        return self.data[mcy-umdy:mcy+dmdy, mcx-lmdx:mcx+rmdx], (lmdx, rmdx, umdy, dmdy)
 
     def set_start(self):
 
@@ -279,11 +466,11 @@ class City:
             x = np.random.randint(self.w)
             y = np.random.randint(self.h)        
 
-        self.data[y, x] = -2 # Start
+        # self.data[y, x] = -2 # Start書き込まない
         self.start_x = x
         self.start_y = y
         
-    def set_goal(self):
+    def set_goal(self, no_cell=False):
         # 地図中にゴールがあれば通路0に置き換えTODO: np.where + random.sampleで置き換える
         self.data = np.where(self.data == -1, 0, self.data)
 
@@ -293,7 +480,8 @@ class City:
             x = np.random.randint(self.w)
             y = np.random.randint(self.h)        
 
-        self.data[y, x] = -1 # Goal
+        if not no_cell:
+            self.data[y, x] = -1 # Goal
         self.goal_x = x
         self.goal_y = y
  
@@ -302,17 +490,14 @@ class City:
         start = (y, x)
         goal = (y, x)
         """
-        import matplotlib.pyplot as plt
-        import matplotlib.cm as cm
-        import matplotlib.colors as colors
-        import numpy as np
         
         
         start_goal = np.zeros((self.h, self.w), dtype=int)
-        cost = np.zeros((self.h, self.w), dtype=int) + 999
+        cost = np.zeros((self.h, self.w), dtype=int) + 1E10
         done = np.zeros((self.h, self.w), dtype=bool)
         barrier = np.zeros((self.h, self.w), dtype=bool) # occupancyも含める
         path = np.zeros((self.h, self.w), dtype=int)
+        entrance = np.zeros((self.h, self.w), dtype=bool)
         
         #プーリング用のフィルタ
         g = np.array([[0, 1, 0],
@@ -329,62 +514,82 @@ class City:
                     start_goal[iy, ix] = 255
                 if self.data[iy, ix] == 1: # barrier
                     barrier[iy, ix] = True 
+                if (iy, ix) in self.entrances:
+                    entrance[iy, ix] = True                
 
         barrier = barrier + self.occupancuy
         barrier[start[0], start[1]] = False
         barrier[goal[0], goal[1]] = False
-        # print(barrier)
+    
         # plt.imshow(barrier, cmap="gist_yarg")
+        # plt.imshow(entrance, cmap=customized_cool)
         # plt.show()
-        
-        # print('start\n{}'.format(start))
-        # print('goal\n{}'.format(goal))
-        # print('cost\n{}'.format(cost))
-        # print('done\n{}'.format(done))
-        # print('barrier\n{}'.format(barrier))
  
-        for i in range(1, 999):
+        for i in range(1, 10000000):
 
             #次に進出するマスのbool
-            done_next = maximum_filter(done, footprint=g) * ~done            
-            # print('done_next\n{}'.format(done_next))
+            done_next = maximum_filter(done, footprint=g) * ~done # 速い
+            # done_next = max_pooling(done) * ~done                    
+            is_entrance = done_next * entrance
 
             #次に進出するマスのcost
-            cost_next = minimum_filter(cost, footprint=g) * done_next
-            cost_next[done_next] += 1
-            #print('cost_next\n{}'.format(cost_next))
-            
+            cost_next = minimum_filter(cost, footprint=g) * done_next # 速い
+            # cost_next = min_pooling(cost) * done_next
+            cost_next[done_next] += 1   
+    
+            # is_entranceがTrueのそれぞれのセルについて、
+            entrance_xy = list(zip(*np.where(is_entrance == True)))
+            for ey, ex in entrance_xy:
+                
+                if done[ey-1, ex] == True and self.room[ey-1, ex] != True:
+                    cost_next[ey, ex] = 10000000
+                    done_next[ey, ex] = False
+                    # print(f"This is entrance, {ey}, {ex}")
+
+                if done[ey, ex+1] == True and self.room[ey, ex+1] != True:
+                    cost_next[ey, ex] = 10000000
+                    done_next[ey, ex] = False
+                    # print(f"This is entrance, {ey}, {ex}")
+
+                if done[ey+1, ex] == True and self.room[ey+1, ex] != True:
+                    cost_next[ey, ex] = 10000000
+                    done_next[ey, ex] = False
+                    # print(f"This is entrance, {ey}, {ex}")
+
+                if done[ey, ex-1] == True and self.room[ey, ex-1] != True:
+                    cost_next[ey, ex] = 10000000
+                    done_next[ey, ex] = False
+                    # print(f"This is entrance, {ey}, {ex}")
+
             #costを更新
             cost[done_next] = cost_next[done_next]
             
-            #ただし障害物のコストは999とする
-            cost[barrier] = 999
-            #print('cost\n{}'.format(cost))
+            #ただし障害物のコストは10000000とする
+            cost[barrier] = 10000000
             
             #探索終了マスを更新
             done[done_next] = done_next[done_next]
             
             #ただし障害物は探索終了としない
             done[barrier] = False
-            #print('done\n{}'.format(done))
-            
-            # x, y = np.where(cost != 999)
-            # c = cost[x, y]
-            # for i in range(len(x)):
-                # plt.text(y[i]-0.1, x[i]+0.1, c[i], size = 20, color = 'gray')
 
-            
             #終了判定
             if done[goal[0], goal[1]] == True:
                 break
-                    #表示
 
-    
+        # if self.debug:
+            # plt.imshow(cost, cmap="jet", vmax=200, vmin=0, alpha=1)
+            # barrier[goal[0], goal[1]] = 255
+            # barrier[start[0], start[1]] = 255
+            # plt.imshow(barrier, cmap=customized_gist_yarg)
+            # plt.show()
+
         point_now = goal
         cost_now = cost[goal[0], goal[1]]
         route = [goal]
-        # print('route\n{}'.format(route))
+
         while cost_now > 0:
+            
             #上から来た場合
             try:
                 if cost[point_now[0] - 1, point_now[1]] == cost_now - 1:
@@ -430,26 +635,12 @@ class City:
             iy = cell[0]
             path[iy, ix] = 1
 
-        if self.debug:        
-            cmap = cm.jet
-            cmap_data = cmap(np.arange(cmap.N))
-            cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
-            customized_jet = colors.ListedColormap(cmap_data)
-
-            cmap = cm.cool
-            cmap_data = cmap(np.arange(cmap.N))
-            cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
-            customized_cool = colors.ListedColormap(cmap_data)
-
-            cmap = cm.gist_yarg
-            cmap_data = cmap(np.arange(cmap.N))
-            cmap_data[0, 3] = 0 # 0 のときのα値を0(透明)にする
-            customized_gist_yarg = colors.ListedColormap(cmap_data)
-
-            plt.imshow(path, cmap=customized_cool)        
-            plt.imshow(barrier, cmap=customized_gist_yarg)
-            plt.show()
+        # if self.debug:        
+        #     plt.imshow(path, cmap=customized_cool)        
+        #     plt.imshow(barrier, cmap=customized_gist_yarg)
+        #     plt.show()
         return route
+    
     
 if __name__ == "__main__":
 
@@ -457,16 +648,13 @@ if __name__ == "__main__":
     
     width = 64
     height = 64
-    map = City(width, height, debug=True)
+    map = Maze(width, height, debug=True)
     # map.create_map_stick_down()
-    map.create_map_dungeon(num_col_rooms=2, num_row_rooms=2, corrider_width=3)
+    # map.create_map_digging()
+    map.create_map_dungeon(num_col_rooms=4, num_row_rooms=4, corrider_width=3)
+    
     map.set_goal()
     map.set_start()
     route = map.search_shortest_path_dws((map.start_y, map.start_x), (map.goal_y, map.goal_x))
-    route_deque = deque(route)
-    print(route_deque)
-    s = route_deque.popleft()
-    n = route_deque.popleft()
-    print(s)
-    print(n)
-    print(map.start_y, map.start_x)
+    # route_deque = deque(route)
+

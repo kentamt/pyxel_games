@@ -103,7 +103,7 @@ class App:
                 ret = (8, 80)
             elif tile_type == TyleType.WALL_OUT_DL_CORNER:
                 ret = (8, 112)
-            elif tile_type == TyleType.WALL_OUT_UR_CORNER:
+            elif tile_type == TyleType.WALL_OUT_UR_CORNER:      
                 ret = (24, 80)
             elif tile_type == TyleType.WALL_OUT_DR_CORNER:
                 ret = (24, 112)

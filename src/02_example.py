@@ -31,14 +31,14 @@ class App:
         
         self.state = State.START
         
-        pyxel.init(96, 64, caption=self.name, scale=6, fps=15)
+        pyxel.init(64, 64, caption=self.name, scale=4, fps=15)
         # pyxel.image(0).load(0, 0, "pyxel_logo_38x16.png") # opening
         
         # 地図の初期化
         self.map = Map(pyxel.width, pyxel.height)
         # self.map.create_map_stick_down()
         self.num_col_rooms = 4
-        self.num_row_rooms = 4
+        self.num_row_rooms = 3
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, num_row_rooms=self.num_row_rooms)
         self.map.set_goal()
         
@@ -165,10 +165,12 @@ class App:
     def draw(self):
         if self.state == State.START:
             pyxel.cls(0)
-            pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "1 PLAYER GAME",  7)            
+            pyxel.text(0, 0, self.name, 7)
+            # pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "1 PLAYER GAME",  7)            
             
         elif self.state == State.MAIN:
             pyxel.cls(0)
+            # pyxel.text(0, 0, self.name, 7)
             
             # 迷路
             self.draw_map()    
@@ -187,7 +189,7 @@ class App:
             pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "NEXT MAP",  7 )            
 
         elif self.state == State.END:
-            pyxel.cls(0)
+            pyxel.cls(0)            
             pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "GAME OVER",  7 )            
 
     def draw_enemy_route(self):
