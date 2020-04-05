@@ -27,8 +27,9 @@ class TyleType(Enum):
     WALL_CORRIDER_UP = 21,
     WALL_CORRIDER_DOWN = 22,
     
-    GOAL = 23
-    
+    GOAL = 23,
+    WALL_IN_DR_CORNER_ONE = 24
+
 def get_tile_loc(tile_type):
     if tile_type == TyleType.WALL_IN_UP:
         ret = (16, 32)
@@ -76,7 +77,10 @@ def get_tile_loc(tile_type):
         ret = (40, 112)
     elif tile_type == TyleType.GOAL:
         ret = (16, 48)
+    elif tile_type == TyleType.WALL_IN_DR_CORNER_ONE:
+        ret = (64, 96) # 鍵字
     else:
         ret = None    
         
+
     return ret

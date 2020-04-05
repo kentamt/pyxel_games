@@ -275,10 +275,10 @@ class Maze:
                 self.room[cy-int(h/2.0):cy+int(h/2.0), cx-int(w/2.0):cx+int(w/2.0)] = True
         
                 # 各部かから通路への垂線を上下左右４本分生成
-                exit_x_up = np.random.randint(cx-int(w/2.0)+1, cx+int(w/2.0)-1)
-                exit_x_down = np.random.randint(cx-int(w/2.0)+1, cx+int(w/2.0)-1)
-                exit_left = np.random.randint(cy-int(h/2.0)+1, cy+int(h/2.0)-1)
-                exit_right = np.random.randint(cy-int(h/2.0)+1, cy+int(h/2.0)-1)
+                exit_x_up = np.random.randint(cx-int(w/2.0)+2, cx+int(w/2.0)-2)
+                exit_x_down = np.random.randint(cx-int(w/2.0)+2, cx+int(w/2.0)-2)
+                exit_left = np.random.randint(cy-int(h/2.0)+2, cy+int(h/2.0)-2)
+                exit_right = np.random.randint(cy-int(h/2.0)+2, cy+int(h/2.0)-2)
                 
                 # cxからcx+rmsx/2.0, cx-rmsx/2.0だけ線を引く
                 # ただし, 端に触れている部屋は通路をつくらない                
