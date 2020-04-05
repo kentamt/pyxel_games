@@ -1,5 +1,5 @@
 # pyxel_games
-Games powered by pyxel
+Games powered by [pyxel](https://github.com/kitao/pyxel)
 
 01_example.py  
 ![01_example](https://github.com/thinkbell/pyxel_games/blob/master/data/01_example.gif)
@@ -20,3 +20,6 @@ Games powered by pyxel
 
 06_example.py  
 ![06_example](https://github.com/thinkbell/pyxel_games/blob/master/data/06_example.gif)
+
+main.py  
+![09_example](https://github.com/thinkbell/pyxel_games/blob/master/data/09_example.gif)
