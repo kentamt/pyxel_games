@@ -1,5 +1,5 @@
 # pyxel_games
-games powered by pyxel
+Games powered by pyxel
 
 01_example.py  
 ![01_example](https://github.com/thinkbell/pyxel_games/blob/master/data/01_example.gif)
