@@ -27,20 +27,26 @@ class Vehicle:
 class App:
     def __init__(self):
 
-        self.name = "02_example"
+        self.name = "RANDOM MAP"
         
         self.state = State.START
+        self.fps = 15
         
-        pyxel.init(64, 64, caption=self.name, scale=4, fps=15)
+        pyxel.init(64, 64, caption=self.name, scale=6, fps=self.fps)
         # pyxel.image(0).load(0, 0, "pyxel_logo_38x16.png") # opening
         
         # 地図の初期化
         self.map = Map(pyxel.width, pyxel.height)
+        
+        self.timer = 30
+        
         # self.map.create_map_stick_down()
         self.num_col_rooms = 4
         self.num_row_rooms = 3
         self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, num_row_rooms=self.num_row_rooms)
         self.map.set_goal()
+        self.floor = 0
+        self.is_open = np.zeros(self.map.data.shape, np.bool)
         
         # 自キャラの初期化
         x = int(np.random.rand() * pyxel.width)
@@ -52,6 +58,9 @@ class App:
         self.ego = Vehicle(x, y, c)
 
         # 敵キャラの初期化
+        # self.num_enemy = 3
+        # self.enemy_list = []        
+        # for idx in range(self.num_enemy)
         x = int(np.random.rand() * pyxel.width)
         y = int(np.random.rand() * pyxel.height)
         while self.map.data[y, x] != 0:
@@ -84,7 +93,7 @@ class App:
                 
                 self.num_got_items = 0
                 self.max_items = 3 # これだけ獲得したら次の画面へ
-
+                self.floor += 1
                 print("Init Map")
                 self.map.create_map_dungeon(num_col_rooms=self.num_col_rooms, num_row_rooms=self.num_row_rooms)
                 self.map.set_goal()
@@ -106,15 +115,21 @@ class App:
                 self.enemy.x = x
                 self.enemy.y = y
                 self.route = deque()
-
+                self.is_open = np.zeros(self.map.data.shape, np.bool)
+                self.timer = 30.0
 
         elif self.state == State.MAIN: # メイン
+            self.timer -= 1./self.fps
 
             # 自キャラの操作            
             self.move_target(self.ego)
 
             # 敵キャラの行動
             self.act_enemy()
+
+            # 到達した地図のフラグをたてる
+            self.is_open[self.ego.y-4:self.ego.y+4, self.ego.x-4:self.ego.x+4] = True
+
 
             # ゴールに到達したかどうかを判定
             if self.map.data[self.ego.y, self.ego.x] == -1:
@@ -128,11 +143,14 @@ class App:
 
             if self.ego.x == self.enemy.x and self.ego.y == self.enemy.y:
                 self.state = State.END
+                
+            if int(self.timer) <= 0:
+                self.state = State.END
 
     def act_enemy(self):
         
         # 最短経路の更新
-        if not pyxel.frame_count % 15:
+        if not pyxel.frame_count % 20:
         
             self.route = self.map.search_shortest_path_dws((self.enemy.y, self.enemy.x), (self.ego.y, self.ego.x))
             self.route = deque(self.route)
@@ -165,13 +183,14 @@ class App:
     def draw(self):
         if self.state == State.START:
             pyxel.cls(0)
-            pyxel.text(0, 0, self.name, 7)
+            pyxel.text(0, 0, "PRESS S", 7)
             # pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "1 PLAYER GAME",  7)            
             
         elif self.state == State.MAIN:
             pyxel.cls(0)
-            # pyxel.text(0, 0, self.name, 7)
-            
+            pyxel.text(0, 0, f"{int(self.timer)}sec", 7)
+            pyxel.text(30,0, f"{self.num_got_items}/{self.max_items}", 7)
+
             # 迷路
             self.draw_map()    
             
@@ -186,11 +205,13 @@ class App:
             
         elif self.state == State.CHANGE:
             pyxel.cls(0)
-            pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "NEXT MAP",  7 )            
+            pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "NEXT FLOOR",  7 )            
 
         elif self.state == State.END:
             pyxel.cls(0)            
             pyxel.text(int(pyxel.width/4.0), int(pyxel.height/2.0), "GAME OVER",  7 )            
+        
+        
 
     def draw_enemy_route(self):
         for cell in self.route:
@@ -203,8 +224,9 @@ class App:
         # 迷路を描画
         for i in range(self.map.w):
             for j in range(self.map.h):
-                if self.map.data[j, i] == 0:
-                    pyxel.rect(i, j, 1, 1, 5)
+                if self.is_open[j, i]:
+                    if self.map.data[j, i] == 0:
+                        pyxel.rect(i, j, 1, 1, 5)
                 if self.map.data[j, i] == -1:
                     pyxel.rect(i, j, 1, 1, 8)
         
