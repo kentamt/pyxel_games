@@ -58,19 +58,18 @@ class App:
         self.ego = Vehicle(x, y, c)
 
         # 敵キャラの初期化
-        # self.num_enemy = 3
-        # self.enemy_list = []        
-        # for idx in range(self.num_enemy)
-        x = int(np.random.rand() * pyxel.width)
-        y = int(np.random.rand() * pyxel.height)
-        while self.map.data[y, x] != 0:
+        self.num_enemy = 3
+        self.enemy_list = []        
+        self.rout_list = []
+        for idx in range(self.num_enemy):
             x = int(np.random.rand() * pyxel.width)
-            y = int(np.random.rand() * pyxel.height)            
-        c = 14
-        self.enemy = Vehicle(x, y, c)
-
-        self.route = deque()
-
+            y = int(np.random.rand() * pyxel.height)
+            while self.map.data[y, x] != 0:
+                x = int(np.random.rand() * pyxel.width)
+                y = int(np.random.rand() * pyxel.height)            
+            c = 14
+            self.enemy_list.append(Vehicle(x, y, c))
+            self.route_list.append(deque())
 
         # 獲得アイテす数
         self.num_got_items = 0
@@ -107,14 +106,16 @@ class App:
                 self.ego.x = x
                 self.ego.y = y
 
-                x = int(np.random.rand() * pyxel.width)
-                y = int(np.random.rand() * pyxel.height)
-                while self.map.data[y, x] != 0:
+                for idx, e in enumerate(self.enemy_list):
                     x = int(np.random.rand() * pyxel.width)
-                    y = int(np.random.rand() * pyxel.height)            
-                self.enemy.x = x
-                self.enemy.y = y
-                self.route = deque()
+                    y = int(np.random.rand() * pyxel.height)
+                    while self.map.data[y, x] != 0:
+                        x = int(np.random.rand() * pyxel.width)
+                        y = int(np.random.rand() * pyxel.height)            
+                    self.enemy_list[idx].x = x
+                    self.enemy_list[idx].y = y
+                    self.route_list[idx] = deque()
+
                 self.is_open = np.zeros(self.map.data.shape, np.bool)
                 self.timer = 30.0
 
@@ -141,27 +142,32 @@ class App:
                 
                 self.map.set_goal()
 
-            if self.ego.x == self.enemy.x and self.ego.y == self.enemy.y:
-                self.state = State.END
+            for idx, e in enumerate(self.enemy_list):
+                enemy = self.enemy_list[idx]
+                if self.ego.x == enemy.x and self.ego.y == enemy.y:
+                    self.state = State.END
                 
             if int(self.timer) <= 0:
                 self.state = State.END
 
     def act_enemy(self):
         
-        # 最短経路の更新
-        if not pyxel.frame_count % 20:
-        
-            self.route = self.map.search_shortest_path_dws((self.enemy.y, self.enemy.x), (self.ego.y, self.ego.x))
-            self.route = deque(self.route)
-            self.route.popleft() # 一つ目はstartなので捨てる
+        for idx, e in enumerate(self.enemy_list):
+            enemy = self.enemy_list[idx]
+            route = self.route_list[idx]
+            # 最短経路の更新
+            if not pyxel.frame_count % 20:
+            
+                route = self.map.search_shortest_path_dws((enemy.y, enemy.x), (self.ego.y, self.ego.x))
+                route = deque(self.route)
+                route.popleft() # 一つ目はstartなので捨てる
 
-        if len(self.route) > 0:
-            next_cell = self.route.popleft()
-            self.enemy.update(next_cell[1], next_cell[0])
+            if len(route) > 0:
+                next_cell = route.popleft()
+                enemy.update(next_cell[1], next_cell[0])
 
-        else:
-            pass
+            else:
+                pass
         
     def move_target(self, target):
         x = target.x
