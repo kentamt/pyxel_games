@@ -1,7 +1,7 @@
 # pyxel_games
 Games powered by [pyxel](https://github.com/kitao/pyxel)
 
-01_example.py  
+<!-- 01_example.py  
 ![01_example](https://github.com/thinkbell/pyxel_games/blob/master/data/01_example.gif)
 
 02_example.py  
@@ -19,7 +19,7 @@ Games powered by [pyxel](https://github.com/kitao/pyxel)
 ![05_example](https://github.com/thinkbell/pyxel_games/blob/master/data/05_example.gif)
 
 06_example.py  
-![06_example](https://github.com/thinkbell/pyxel_games/blob/master/data/06_example.gif)
+![06_example](https://github.com/thinkbell/pyxel_games/blob/master/data/06_example.gif) -->
 
 main.py  
 ![09_example](https://github.com/thinkbell/pyxel_games/blob/master/data/09_example.gif)
