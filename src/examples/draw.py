@@ -4,11 +4,11 @@ import numpy as np
 import random
 from collections import deque
 
-init(128,128)
+init(256,256)
 rs = np.random.rand(np.random.randint(1, 3))*5
 colors = [5, 12]
 center = [np.random.randint(128), np.random.randint(128)]
-
+max_size = 256
 class Drop:
     def __init__(self, c, rs, colors):
         self.c = c
@@ -37,7 +37,7 @@ while 1:
             if not e.is_alive:
                 drops.pop(i)
     if np.random.rand() > 0.9:
-        center = [np.random.randint(128), np.random.randint(128)]
+        center = [np.random.randint(max_size), np.random.randint(max_size)]
         rs = np.random.rand(np.random.randint(1, 5))*10
         colors = [5, 12]
         drop = Drop(center, rs, colors)
