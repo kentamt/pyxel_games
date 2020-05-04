@@ -36,14 +36,15 @@ class App:
     def __init__(self):
 
         # ゲームの名前
-        self.name = "09_example"
+        self.name = "TEST"
         
         # ゲームの状態
         self.state = State.START
         self.turn = Turn.EGO
 
         # ゲームの設定
-        pyxel.init(256, 256, caption=self.name, scale=2, fps=12)# , palette=palette)
+        # palette=[0x000000, 0x1D2B53, 0x7E2553, 0x008751, 0xAB5236, 0x5F574F, 0xC2C3C7, 0xFFF1E8, 0xFF004D, 0xFFA300, 0xFFEC27, 0x00E436, 0x29ADFF, 0x83769C, 0xFF77A8, 0xFFCCAA]
+        pyxel.init(256, 256, caption=self.name, scale=2, fps=12) #, palette=palette)
         pyxel.load("my_resource.pyxres")
         pyxel.playm(0, loop=True)        
         
@@ -90,7 +91,7 @@ class App:
         self.occupancy[yx[0], yx[1]] = True
 
         # 敵キャラの配置
-        self.num_enemies = 0 # np.random.randint(2, 5)
+        self.num_enemies = 4 # np.random.randint(2, 5)
         self.enemies = []
         for _ in range(self.num_enemies):
             yx = self.map.get_free_space(num=1)
@@ -186,7 +187,7 @@ class App:
                     if np.all(diff == 0):
                         tile_info_map_copy[iy:iy+2, ix:ix+2] = dst
             self.tile_info_map = copy.deepcopy(tile_info_map_copy)
-            print(self.tile_info_map)
+            # print(self.tile_info_map)
 
     def update(self):
         """
