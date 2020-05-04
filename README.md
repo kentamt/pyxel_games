@@ -8,4 +8,4 @@ bound.py
 ![pyxel-200504-141917](https://user-images.githubusercontent.com/3883043/80942665-50910380-8e20-11ea-8cc2-fcffb2c70c39.gif)  
 
 draw.py  
-![pyxel-200504-115623](https://user-images.githubusercontent.com/3883043/80942706-6b637800-8e20-11ea-8123-c2b81d15aaf1.gif)  
+![pyxel-200504-162145](https://user-images.githubusercontent.com/3883043/80943949-63590780-8e23-11ea-8526-60b623b61408.gif)
