@@ -1,25 +1,11 @@
 # pyxel_games
 Games powered by [pyxel](https://github.com/kitao/pyxel)
 
-<!-- 01_example.py  
-![01_example](https://github.com/thinkbell/pyxel_games/blob/master/data/01_example.gif)
-
-02_example.py  
-![02_example](https://github.com/thinkbell/pyxel_games/blob/master/data/02_example.gif)
-
-03_example.py  
-![03_example](https://github.com/thinkbell/pyxel_games/blob/master/data/03_example.gif)
-
-04_example.py
-<div align="left">
-<img src="https://github.com/thinkbell/pyxel_games/blob/master/data/04_example.jpg" width="320">
-</div>
-
-05_example.py  
-![05_example](https://github.com/thinkbell/pyxel_games/blob/master/data/05_example.gif)
-
-06_example.py  
-![06_example](https://github.com/thinkbell/pyxel_games/blob/master/data/06_example.gif) -->
-
 main.py  
 ![09_example](https://github.com/thinkbell/pyxel_games/blob/master/data/09_example.gif)
+
+bound.py
+![pyxel-200504-141917](https://user-images.githubusercontent.com/3883043/80942665-50910380-8e20-11ea-8cc2-fcffb2c70c39.gif)
+
+draw.py
+![pyxel-200504-115623](https://user-images.githubusercontent.com/3883043/80942706-6b637800-8e20-11ea-8123-c2b81d15aaf1.gif)
