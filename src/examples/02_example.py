@@ -1,7 +1,7 @@
 import random
 from enum import Enum
 from collections import deque
-
+import random
 import numpy as np
 import pyxel
 
@@ -32,7 +32,7 @@ class App:
         self.state = State.START
         self.fps = 15
         
-        pyxel.init(64, 64, caption=self.name, scale=6, fps=self.fps)
+        pyxel.init(64, 64, caption=self.name, scale=10, fps=self.fps)
         # pyxel.image(0).load(0, 0, "pyxel_logo_38x16.png") # opening
         
         # 地図の初期化
@@ -60,7 +60,7 @@ class App:
         # 敵キャラの初期化
         self.num_enemy = 3
         self.enemy_list = []        
-        self.rout_list = []
+        self.route_list = []
         for idx in range(self.num_enemy):
             x = int(np.random.rand() * pyxel.width)
             y = int(np.random.rand() * pyxel.height)
@@ -129,6 +129,7 @@ class App:
             self.act_enemy()
 
             # 到達した地図のフラグをたてる
+            self.is_open = np.zeros(self.map.data.shape, np.bool)
             self.is_open[self.ego.y-4:self.ego.y+4, self.ego.x-4:self.ego.x+4] = True
 
 
@@ -153,18 +154,34 @@ class App:
     def act_enemy(self):
         
         for idx, e in enumerate(self.enemy_list):
-            enemy = self.enemy_list[idx]
-            route = self.route_list[idx]
             # 最短経路の更新
-            if not pyxel.frame_count % 20:
+            if not pyxel.frame_count % random.randint(10, 30):
             
-                route = self.map.search_shortest_path_dws((enemy.y, enemy.x), (self.ego.y, self.ego.x))
-                route = deque(self.route)
-                route.popleft() # 一つ目はstartなので捨てる
+                self.route_list[idx] = self.map.search_shortest_path_dws((self.enemy_list[idx].y, self.enemy_list[idx].x), (self.ego.y, self.ego.x))
+                self.route_list[idx] = deque(self.route_list[idx])
+                                
+                self.route_list[idx].popleft() # 一つ目はstartなので捨てる
 
-            if len(route) > 0:
-                next_cell = route.popleft()
-                enemy.update(next_cell[1], next_cell[0])
+                # 長すぎる場合は遠いので敵は察知してこない
+                if len(self.route_list[idx]) > 50:
+                    self.route_list[idx] = deque()
+
+                # ランダムな長さにカット
+                while len(self.route_list[idx]) > random.randint(10,50):
+                    self.route_list[idx].pop()
+
+            # # ランダムにルートを忘れる
+            # if random.random() < 0.05:
+            #     self.route_list[idx] = deque()
+            
+            # if len(self.route_list[idx]) > 1:
+            #     next_cell = self.route_list[idx].popleft()
+            #     next_cell = self.route_list[idx].popleft()
+            #     self.enemy_list[idx].update(next_cell[1], next_cell[0])
+
+            if len(self.route_list[idx]) > 0:
+                next_cell = self.route_list[idx].popleft()
+                self.enemy_list[idx].update(next_cell[1], next_cell[0])
 
             else:
                 pass
@@ -207,7 +224,8 @@ class App:
             pyxel.rect(self.ego.x, self.ego.y, 1, 1, self.ego.c)
             
             # 敵キャラ
-            pyxel.rect(self.enemy.x, self.enemy.y, 1, 1, self.enemy.c)
+            for idx, e in enumerate(self.enemy_list):
+                pyxel.rect(self.enemy_list[idx].x, self.enemy_list[idx].y, 1, 1, self.enemy_list[idx].c)
             
         elif self.state == State.CHANGE:
             pyxel.cls(0)
@@ -220,10 +238,15 @@ class App:
         
 
     def draw_enemy_route(self):
-        for cell in self.route:
-            x = cell[1]
-            y = cell[0]
-            pyxel.rect(x, y, 1, 1, 6)
+        for idx, r in enumerate(self.route_list):
+            n_cell_draw = 0
+            for cell in self.route_list[idx]:
+                x = cell[1]
+                y = cell[0]
+                pyxel.rect(x, y, 1, 1, 13)
+                n_cell_draw += 1
+                if n_cell_draw > 10:
+                    break
 
             
     def draw_map(self):
